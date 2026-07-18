@@ -1,0 +1,42 @@
+/* ───────────────────────────────────────────────
+   FitFighters — Spacing, radius, shadow tokens
+   Spacing follows the 4dp Compose grid.
+   Radius source: ui/theme/Shape.kt
+─────────────────────────────────────────────── */
+
+:root {
+  /* ── Spacing (4px grid) ───────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;   /* default screen gutter */
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Default horizontal screen padding in the app */
+  --gutter: 16px;
+
+  /* ── Radius (Shape.kt) ────────────────── */
+  --radius-cta:    10px;  /* CtaButtonShape — primary/secondary buttons */
+  --radius-md:     12px;  /* standard cards, text fields use large */
+  --radius-lg:     14px;  /* larger cards, text fields, chips */
+  --radius-card:   16px;  /* section / content cards (rounded 16 in code) */
+  --radius-xl:     32px;  /* pills, bottom sheets */
+  --radius-full:   999px; /* circular — avatars, control buttons */
+
+  /* ── Borders ──────────────────────────── */
+  --border-width: 1px;
+
+  /* ── Elevation ────────────────────────────
+     The app is flat — surfaces separate by 1px outline + tonal
+     background steps, NOT drop shadows. Shadow is reserved for
+     genuinely floating chrome (FAB, device frame). */
+  --shadow-fab:   0 6px 16px rgba(0,0,0,0.45);
+  --shadow-sheet: 0 -8px 32px rgba(0,0,0,0.50);
+
+  /* ── Hit target ───────────────────────── */
+  --hit-target: 44px;
+}

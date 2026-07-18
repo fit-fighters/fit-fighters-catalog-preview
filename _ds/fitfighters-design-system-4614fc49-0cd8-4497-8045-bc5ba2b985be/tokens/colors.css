@@ -1,0 +1,77 @@
+/* ───────────────────────────────────────────────
+   FitFighters — Color tokens
+   Source of truth: app/src/main/java/com/fitfighters/ui/theme/Color.kt + Theme.kt
+   The app ships dark-first; light is a clean mirror.
+   Base palette + Material-3-style semantic aliases (dark default).
+─────────────────────────────────────────────── */
+
+:root {
+  /* ── Brand ────────────────────────────── */
+  --ff-red:            #FF3200;   /* primary — updated Apr 2026 from #E03030 */
+  --ff-red-light:      #FF6A42;   /* onPrimaryContainer (dark), hovers */
+  --ff-red-dark:       #CC2800;   /* onPrimaryContainer (light), pressed */
+
+  /* ── Dark scheme base ─────────────────── */
+  --ff-bg:             #0F0F0F;   /* background */
+  --ff-surface:        #1A1A1A;   /* surface — cards */
+  --ff-surface-2:      #222222;   /* surfaceVariant — inner fills, icon tiles */
+  --ff-border:         #2A2A2A;   /* outline — dividers, card borders */
+  --ff-text:           #F0F0F0;   /* onSurface / onBackground */
+  --ff-text-2:         #888888;   /* onSurfaceVariant — secondary text */
+  --ff-text-3:         #555555;   /* outlineVariant — tertiary / muted */
+  --ff-navbar:         #141414;   /* surfaceContainer — bottom nav */
+  --ff-nav-indicator:  rgba(255,50,0,0.15); /* selected pill, 15% red */
+
+  /* ── Semantic ─────────────────────────── */
+  --ff-green:          #2ECF7A;   /* success, focused inputs, For Time */
+  --ff-error:          #FF5C5C;   /* error / destructive */
+  --ff-on-primary:     #FFFFFF;
+
+  /* primaryContainer — chip/badge fills */
+  --ff-primary-container: rgba(255,50,0,0.15);
+
+  /* ── Section type colors ──────────────── */
+  /* Identify workout block types. Used directly — NOT via primary. */
+  --ff-section-cycle:    #FF3200;
+  --ff-section-stripset: #FF9A3C;
+  --ff-section-fortime:  #2ECF7A;
+  --ff-section-amrap:    #4DA6FF;
+  --ff-section-cardio:   #4DA6FF;
+  --ff-section-emom:     #C77DFF;
+  --ff-section-rest:     #6B7A8D;
+
+  /* ── Workout subscription action cards ── */
+  --ff-action-success-bg:     #161F1A;
+  --ff-action-success-border: rgba(93,200,160,0.20);
+  --ff-action-danger-bg:      #1C1212;
+  --ff-action-danger-border:  rgba(255,50,0,0.25);
+  --ff-action-info-bg:        #131620;
+  --ff-action-info-border:    rgba(80,120,200,0.20);
+
+  /* ── Semantic aliases (theme-agnostic names) ── */
+  --surface-page:    var(--ff-bg);
+  --surface-card:    var(--ff-surface);
+  --surface-inset:   var(--ff-surface-2);
+  --border-default:  var(--ff-border);
+  --text-primary:    var(--ff-text);
+  --text-secondary:  var(--ff-text-2);
+  --text-muted:      var(--ff-text-3);
+  --accent:          var(--ff-red);
+  --accent-on:       var(--ff-on-primary);
+}
+
+/* ── Light scheme ───────────────────────────────
+   Opt-in mirror. Apply [data-theme="light"] on a wrapper. */
+[data-theme="light"] {
+  --ff-bg:            #F5F5F5;
+  --ff-surface:       #FFFFFF;
+  --ff-surface-2:     #F0F0F0;
+  --ff-border:        #E0E0E0;
+  --ff-text:          #141414;
+  --ff-text-2:        #666666;
+  --ff-text-3:        #AAAAAA;
+  --ff-navbar:        #FFFFFF;
+  --ff-nav-indicator: rgba(255,50,0,0.10);
+  --ff-red-light:     #CC2800;
+  --ff-primary-container: rgba(255,50,0,0.10);
+}

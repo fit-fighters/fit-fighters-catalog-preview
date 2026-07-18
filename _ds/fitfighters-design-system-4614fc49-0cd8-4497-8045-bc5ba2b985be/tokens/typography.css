@@ -1,0 +1,52 @@
+/* ───────────────────────────────────────────────
+   FitFighters — Typography tokens
+   Source: app/src/main/java/com/fitfighters/ui/theme/Type.kt
+   Michroma         → display / headline / title / buttons
+   Roboto Condensed → body / labels / numeric data
+   Android sp sizes are mapped 1:1 to px.
+─────────────────────────────────────────────── */
+
+:root {
+  /* ── Families ─────────────────────────── */
+  --font-display: "Michroma", "Arial Narrow", sans-serif;   /* titles, emphasis */
+  --font-body:    "Roboto Condensed", "Arial Narrow", sans-serif; /* text, data */
+  --font-data:    "Roboto Condensed", "Arial Narrow", sans-serif; /* numeric/mono role */
+
+  /* ── Display (Michroma) ───────────────── */
+  --type-display-lg:  32px;  /* program name, parallax header */
+  --type-display-md:  26px;  /* detail screen large title */
+  --type-display-sm:  22px;
+
+  /* ── Headline / Title (Michroma) ──────── */
+  --type-headline-lg: 18px;  /* sticky section header "Semana 1" */
+  --type-title-lg:    16px;  /* day name, routine section name */
+  --type-title-md:    13px;  /* exercise name inside card */
+  --type-title-sm:    13px;  /* block type "Ciclo 1" */
+
+  /* ── Body (Roboto Condensed) ──────────── */
+  --type-body-lg:     15px;  /* routine description */
+  --type-body-md:     13px;  /* secondary text, notes */
+  --type-body-sm:     11px;
+
+  /* ── Label / Data (Roboto Condensed) ──── */
+  --type-label-lg:    13px;  /* "3 series", metadata */
+  --type-label-md:    15px;  /* compact data */
+  --type-label-sm:    10px;  /* "reps", "seg", units, badges */
+
+  /* ── Trainer display sizes ────────────── */
+  --type-trainer-number: 60px; /* big rep/time number */
+  --type-trainer-panel:  32px; /* panel value */
+
+  /* ── Weights (Roboto Condensed is variable) ── */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Letter spacing ───────────────────── */
+  --tracking-display: -0.5px; /* tight on large Michroma */
+  --tracking-tight:   -0.3px;
+  --tracking-normal:  0;
+  --tracking-label:   0.08em; /* uppercase mono labels */
+  --tracking-eyebrow: 0.12em; /* section eyebrow labels */
+}
