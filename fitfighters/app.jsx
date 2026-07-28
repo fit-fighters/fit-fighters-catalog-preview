@@ -117,28 +117,27 @@ window.RegisterScreen = RegisterScreen;
 // FitFighters mobile — Onboarding wizard: datos personales, experiencia,
 // grupos musculares (solo si Intermedio/Avanzado), objetivo, lugar y días.
 
-function ExperienceLevelOptionCard({ title, description, selected, onClick }) {
+function ExperienceLevelOptionCard({ description, selected, onClick }) {
   return (
     <button
       onClick={onClick}
       style={{
         width: "100%", textAlign: "left", cursor: "pointer",
-        borderRadius: "var(--radius-lg)", padding: "14px 16px",
+        borderRadius: "var(--radius-lg)", padding: "16px",
         background: selected ? "var(--ff-primary-container)" : "var(--ff-surface)",
         border: `1px solid ${selected ? "var(--ff-red)" : "var(--ff-border)"}`,
-        display: "flex", flexDirection: "column", gap: 4,
       }}
     >
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, color: selected ? "var(--ff-red-light)" : "var(--ff-text)" }}>{title}</span>
-      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.4 }}>{description}</span>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: selected ? "var(--ff-red-light)" : "var(--ff-text)", lineHeight: 1.4 }}>{description}</span>
     </button>
   );
 }
 
+// Solo se muestra la frase en lenguaje natural — sin etiquetas técnicas de nivel.
 const EXPERIENCE_LEVELS = [
-  { value: "beginner", title: "Fundamentos", description: "No, estoy comenzando desde cero" },
-  { value: "intermediate", title: "Principiante", description: "Sí, llevo menos de 2 años entrenando de forma regular" },
-  { value: "advanced", title: "Intermedio / Avanzado", description: "Sí, llevo más de 2 años entrenando" },
+  { value: "beginner", description: "Estoy comenzando." },
+  { value: "intermediate", description: "Llevo menos de 2 años entrenando de forma regular." },
+  { value: "advanced", description: "Llevo más de 2 años entrenando de forma regular." },
 ];
 
 const MUSCLE_GROUPS = [
@@ -158,6 +157,24 @@ const FITNESS_GOALS = [
   { value: "muscle_gain", label: "Aumentar musculatura" },
   { value: "health", label: "Mejorar mi salud" },
 ];
+
+const UNIT_SYSTEMS = [
+  { value: "metric", label: "Métrico (kg, cm)" },
+  { value: "imperial", label: "Inglés (lb, in)" },
+];
+
+// Rangos válidos por sistema de unidades (paridad con Constants.kt / PersonalInfoValidator.kt).
+const MEASUREMENT_RANGES = {
+  metric: { height: { min: 120, max: 230, unit: "cm" }, weight: { min: 30, max: 250, unit: "kg" } },
+  imperial: { height: { min: 47.2, max: 90.5, unit: "in" }, weight: { min: 66, max: 550, unit: "lb" } },
+};
+
+function outOfRange(value, range) {
+  if (!value) return null;
+  const n = parseFloat(value);
+  if (Number.isNaN(n) || n < range.min || n > range.max) return range;
+  return null;
+}
 
 const TRAINING_PLACES = [
   { value: "gym", label: "Gimnasio" },
@@ -183,12 +200,16 @@ function OnboardingStepShell({ children }) {
   );
 }
 
-function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperienceLevel = null }) {
+function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperienceLevel = null, initialHeight = "", initialWeight = "", initialUnitSystem = "metric" }) {
   const [step, setStep] = React.useState(initialStep);
   const [gender, setGender] = React.useState(null);
   const [birthdate, setBirthdate] = React.useState("");
-  const [height, setHeight] = React.useState("");
-  const [weight, setWeight] = React.useState("");
+  const [unitSystem, setUnitSystem] = React.useState(initialUnitSystem);
+  const [height, setHeight] = React.useState(initialHeight);
+  const [weight, setWeight] = React.useState(initialWeight);
+  const ranges = MEASUREMENT_RANGES[unitSystem];
+  const invalidHeightRange = outOfRange(height, ranges.height);
+  const invalidWeightRange = outOfRange(weight, ranges.weight);
   const [experienceLevel, setExperienceLevel] = React.useState(initialExperienceLevel);
   const [muscleGroups, setMuscleGroups] = React.useState(new Set());
   const [goal, setGoal] = React.useState(null);
@@ -211,7 +232,7 @@ function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperien
 
   const stepValid = (() => {
     switch (stepKey) {
-      case "personal": return !!gender && birthdate.length > 0 && height.length > 0 && weight.length > 0;
+      case "personal": return !!gender && birthdate.length > 0 && height.length > 0 && weight.length > 0 && !invalidHeightRange && !invalidWeightRange;
       case "experience": return !!experienceLevel;
       case "muscle": return muscleGroups.size > 0;
       case "objective": return !!goal;
@@ -255,8 +276,30 @@ function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperien
             </div>
             <p style={{ margin: "6px 2px 0", fontSize: 11, color: "var(--ff-text-3)" }}>Edad mínima: 14 años.</p>
           </div>
-          <TextField label="Altura (cm)" type="number" value={height} onChange={setHeight} />
-          <TextField label="Peso (kg)" type="number" value={weight} onChange={setWeight} />
+          <div>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 8px" }}>Sistema de unidades</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              {UNIT_SYSTEMS.map(u => (
+                <Chip key={u.value} selected={unitSystem === u.value} onClick={() => setUnitSystem(u.value)} style={{ flex: 1 }}>{u.label}</Chip>
+              ))}
+            </div>
+          </div>
+          <TextField
+            label={unitSystem === "metric" ? "Altura (cm)" : "Altura (in)"}
+            type="number"
+            value={height}
+            onChange={setHeight}
+            error={!!invalidHeightRange}
+            supportingText={invalidHeightRange ? `Ingresa una estatura entre ${invalidHeightRange.min} y ${invalidHeightRange.max} ${invalidHeightRange.unit}.` : ""}
+          />
+          <TextField
+            label={unitSystem === "metric" ? "Peso (kg)" : "Peso (lb)"}
+            type="number"
+            value={weight}
+            onChange={setWeight}
+            error={!!invalidWeightRange}
+            supportingText={invalidWeightRange ? `Ingresa un peso entre ${invalidWeightRange.min} y ${invalidWeightRange.max} ${invalidWeightRange.unit}.` : ""}
+          />
         </div>
       </OnboardingStepShell>
     );
@@ -267,7 +310,7 @@ function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperien
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center" }}>¿Actualmente estás entrenando de forma regular?</p>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
           {EXPERIENCE_LEVELS.map(lvl => (
-            <ExperienceLevelOptionCard key={lvl.value} title={lvl.title} description={lvl.description} selected={experienceLevel === lvl.value} onClick={() => setExperienceLevel(lvl.value)} />
+            <ExperienceLevelOptionCard key={lvl.value} description={lvl.description} selected={experienceLevel === lvl.value} onClick={() => setExperienceLevel(lvl.value)} />
           ))}
         </div>
       </OnboardingStepShell>
@@ -479,39 +522,179 @@ function DualProgressBar({ user, plan }) {
   );
 }
 
-function SectionCard({ s, defaultOpen }) {
-  const [open, setOpen] = React.useState(!!defaultOpen);
-  if (s.type === "rest") {
+// ── Routine detail block/exercise system — paridad con FFSectionCard.kt / ExerciseItem.kt ──
+
+function fmtCountdown(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function RIRBadge({ rir }) {
+  const failure = rir === 0;
+  return (
+    <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, color: failure ? "#fff" : "var(--ff-red-light)", background: failure ? "var(--ff-red)" : "var(--ff-primary-container)", borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap" }}>
+      {failure ? "Al fallo" : `RIR ${rir}`}
+    </span>
+  );
+}
+
+function ExerciseDescriptionView({ desc }) {
+  if (!desc) return null;
+  const col = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 };
+  const num = { fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.1 };
+  const unit = { fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)" };
+  if (desc.kind === "repeats") {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px" }}>
-        <div style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
-        <SectionBadge type="rest" label="Descanso" />
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>{s.meta}</span>
-        <div style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
+      <div style={col}>
+        <span style={num}>{desc.reps}</span>
+        <span style={unit}>{desc.reps === 1 ? "rep" : "reps"}</span>
+        {desc.rir !== undefined && desc.rir !== null && <RIRBadge rir={desc.rir} />}
       </div>
     );
   }
+  if (desc.kind === "time") {
+    return (
+      <div style={col}>
+        <span style={num}>{desc.time}</span>
+        <span style={unit}>{desc.unit}</span>
+      </div>
+    );
+  }
+  if (desc.kind === "stripset") {
+    return (
+      <div style={col}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text-2)", textAlign: "right" }}>{desc.reps.join(" · ")}</span>
+        <span style={unit}>reps</span>
+        {desc.rir !== undefined && desc.rir !== null && <RIRBadge rir={desc.rir} />}
+      </div>
+    );
+  }
+  if (desc.kind === "emom") {
+    return (
+      <div style={col}>
+        <span style={num}>{desc.initial}</span>
+        <span style={unit}>rep inicial</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-red-light)" }}>+{desc.increment} / min</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function RoutineExerciseRow({ ex, isLast }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
+          {ex.img ? <img src={ex.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+        </div>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", lineHeight: 1.3 }}>{ex.name}</span>
+        <ExerciseDescriptionView desc={ex.desc} />
+      </div>
+      {ex.rest && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: "var(--ff-surface-2)", borderTop: "1px solid var(--ff-border)", borderBottom: "1px solid var(--ff-border)" }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Descanso</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-text-2)" }}>{ex.rest}</span>
+        </div>
+      )}
+      {!isLast && !ex.rest && <div style={{ borderTop: "1px solid var(--ff-border)" }} />}
+    </div>
+  );
+}
+
+function BlockCountdownStrip({ label, value, color }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: `linear-gradient(to right, color-mix(in srgb, ${color} 8%, transparent), transparent)`, borderBottom: "1px solid var(--ff-border)" }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)" }}>{label}</span>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 14, color }}>{value}</span>
+    </div>
+  );
+}
+
+function BlockInfoStrip({ block, color }) {
+  const rows = [];
+  if (block.type === "fortime" && block.hint) {
+    rows.push(<div key="hint" style={{ padding: "10px 16px", background: "var(--ff-surface-2)", borderBottom: "1px solid var(--ff-border)" }}><span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)" }}>{block.hint}</span></div>);
+  }
+  if (block.type === "amrap" && block.totalTimeSeconds) {
+    rows.push(<BlockCountdownStrip key="amrap" label="Tiempo total" value={fmtCountdown(block.totalTimeSeconds)} color={color} />);
+  }
+  if (block.type === "cardio" && block.totalTimeSeconds) {
+    rows.push(<BlockCountdownStrip key="cardio" label="Duración total" value={fmtCountdown(block.totalTimeSeconds)} color={color} />);
+  }
+  if (block.type === "emom") {
+    const value = block.repsIncrement ? `↑ +${block.repsIncrement} reps / min` : "hasta el fallo";
+    rows.push(<BlockCountdownStrip key="emom" label="En el minuto" value={value} color="var(--ff-green)" />);
+  }
+  if ((block.type === "cycle" || block.type === "stripset") && block.restBetweenSeriesSeconds) {
+    rows.push(
+      <div key="seriesrest" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", background: "var(--ff-surface-2)", borderBottom: "1px solid var(--ff-border)" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)" }}>Descanso entre series</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text)" }}>{block.restBetweenSeriesSeconds} seg.</span>
+      </div>
+    );
+  }
+  return rows.length ? <>{rows}</> : null;
+}
+
+function RoutineSectionCard({ block, defaultOpen }) {
+  const [open, setOpen] = React.useState(!!defaultOpen);
+  const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
+  const meta = block.type === "fortime" ? (block.rounds ? `${block.rounds} rondas` : null) : (block.series ? `${block.series} series` : null);
   return (
     <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
       <div onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", cursor: "pointer" }}>
-        <SectionBadge type={s.type} label={s.name} />
+        <SectionBadge type={block.type} label={block.name} />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>{s.meta}</span>
+          {meta && <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>{meta}</span>}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-2)" strokeWidth="2" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .25s" }}><polyline points="6 9 12 15 18 9" /></svg>
         </div>
       </div>
+      <div style={{ borderTop: "1px solid var(--ff-border)" }} />
+      {!open && (
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0, padding: "10px 16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {block.exercises.map(e => e.name.split(" ").slice(0, 3).join(" ")).join(" · ")}
+        </p>
+      )}
       {open && (
-        <div style={{ borderTop: "1px solid var(--ff-border)" }}>
-          {s.exercises.map((ex, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderTop: i ? "1px solid var(--ff-border)" : "none" }}>
-              <div style={{ width: 38, height: 38, borderRadius: 9, background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text-3)" }}>{i + 1}</span>
-              </div>
-              <span style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.3 }}>{ex}</span>
-            </div>
-          ))}
+        <div>
+          <BlockInfoStrip block={block} color={color} />
+          {block.exercises.map((ex, i) => <RoutineExerciseRow key={i} ex={ex} isLast={i === block.exercises.length - 1} />)}
         </div>
       )}
+    </div>
+  );
+}
+
+function RoutineRestStrip({ block }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, border: "1px solid var(--ff-border)", borderRadius: 16, padding: "13px 16px" }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-2)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><polyline points="12 7 12 12 15 14" /></svg>
+      </div>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-text)", margin: 0 }}>Descanso entre bloques</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "2px 0 0" }}>Recupérate antes del siguiente bloque</p>
+      </div>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text-2)" }}>{fmtCountdown(block.timeSeconds)}</span>
+    </div>
+  );
+}
+
+// Confirmar reinicio del plan gratuito de 4 semanas (recarga desde la semana 1).
+function ResetPlanDialog({ onDismiss, onConfirm }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "flex-end", zIndex: 20 }} onClick={onDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "20px 20px 0 0", padding: "22px 16px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--ff-border)", margin: "0 auto 4px" }} />
+        <div>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", margin: "0 0 6px" }}>¿Reiniciar tu plan gratuito?</h2>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0 }}>Tu progreso actual se perderá y volverás a la semana 1 de tus 4 semanas gratuitas.</p>
+        </div>
+        <button onClick={onConfirm} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 14, cursor: "pointer" }}>Reiniciar desde la semana 1</button>
+        <button onClick={onDismiss} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, border: "1px solid var(--ff-border)", background: "transparent", color: "var(--ff-text-2)", fontFamily: "var(--font-display)", fontSize: 14, cursor: "pointer" }}>Cancelar</button>
+      </div>
     </div>
   );
 }
@@ -630,6 +813,8 @@ function WorkoutScreen({ onSelectDay, tab, onTab, bannerVariant = null }) {
   const [selectedWeek, setSelectedWeek] = React.useState(p.week);
   const [cardDismissed, setCardDismissed] = React.useState(false);
   const [todayVisible, setTodayVisible] = React.useState(true);
+  const [resetDialogOpen, setResetDialogOpen] = React.useState(false);
+  const [justReset, setJustReset] = React.useState(false);
 
   const card = (bannerVariant && bannerVariant !== "none" && bannerVariant !== "tutorial") ? STATUS_ACTIONS[bannerVariant] : null;
 
@@ -682,6 +867,12 @@ function WorkoutScreen({ onSelectDay, tab, onTab, bannerVariant = null }) {
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Workout">
       <AppBar variant="logo" />
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "4px 16px 96px" }}>
+        {justReset && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(46,207,122,0.1)", border: "0.5px solid rgba(46,207,122,.3)", borderRadius: 12, padding: "10px 14px", marginBottom: 14 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text)" }}>Tu plan se reinició. ¡Vamos con la semana 1!</span>
+          </div>
+        )}
         {/* Program header */}
         <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: 18, marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -707,6 +898,12 @@ function WorkoutScreen({ onSelectDay, tab, onTab, bannerVariant = null }) {
               <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)" }}>Plan {p.planProgress}%</span>
             </div>
           </div>
+          {p.isFreePlan && (
+            <button onClick={() => setResetDialogOpen(true)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", justifyContent: "center", marginTop: 14, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+              Reiniciar plan gratuito (semana 1)
+            </button>
+          )}
         </div>
 
         {/* Week selector — plan puede tener 4 a 8 semanas; el usuario navega cualquiera */}
@@ -751,6 +948,13 @@ function WorkoutScreen({ onSelectDay, tab, onTab, bannerVariant = null }) {
         </div>
       )}
 
+      {resetDialogOpen && (
+        <ResetPlanDialog
+          onDismiss={() => setResetDialogOpen(false)}
+          onConfirm={() => { setResetDialogOpen(false); setSelectedWeek(1); setJustReset(true); }}
+        />
+      )}
+
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
         <BottomNav active={tab} onChange={onTab} />
       </div>
@@ -768,32 +972,40 @@ function WorkoutDetailScreen({ item, onBack, onStart }) {
   const day = item || { day: "Hoy", routine: d.program.day };
   const isToday = day.status === "today";
   const isDone = day.status === "done";
+  const [markedDone, setMarkedDone] = React.useState(isDone);
+  const blocks = d.routineDetailBlocks || [];
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Detalle rutina">
       <AppBar variant="title" title={day.day} showBack onBack={onBack} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 110px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 2px 4px" }}>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".1em", margin: 0 }}>{d.program.name}{day.week ? ` · Semana ${day.week}` : ""}{day.date ? ` · ${day.date}` : ""}</p>
           {isToday && (
             <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "#fff", background: "var(--ff-red)", padding: "1px 6px", borderRadius: 999 }}>HOY</span>
           )}
-          {isDone && (
+          {markedDone && (
             <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--ff-green)", background: "rgba(46,207,122,0.14)", border: "0.5px solid rgba(46,207,122,0.3)", padding: "1px 6px", borderRadius: 999 }}>COMPLETADA</span>
           )}
         </div>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", lineHeight: 1.2, letterSpacing: "-.3px", margin: "0 2px 18px" }}>{day.routine}</h1>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {d.sections.map((s, i) => <SectionCard key={i} s={s} defaultOpen={i === 0} />)}
+          {blocks.map((b, i) => b.type === "rest" ? <RoutineRestStrip key={i} block={b} /> : <RoutineSectionCard key={i} block={b} defaultOpen={i === 0} />)}
         </div>
       </div>
 
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
-        <div style={{ padding: "12px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 70%, transparent)" }}>
-          <Button variant="primary" onClick={onStart}>{isDone ? "Repetir rutina" : "Comenzar rutina"}</Button>
-        </div>
+      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)", display: "flex", flexDirection: "column", gap: 10 }}>
+        <Button variant="primary" onClick={onStart}>{markedDone ? "Repetir con entrenador virtual" : "Comenzar con entrenador virtual"}</Button>
+        {/* Para quienes siguen la rutina leyendo la descripción, sin abrir el entrenador virtual */}
+        <button
+          onClick={() => setMarkedDone(v => !v)}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: 10, border: "1px solid var(--ff-border)", background: markedDone ? "rgba(46,207,122,0.1)" : "var(--ff-surface)", color: markedDone ? "var(--ff-green)" : "var(--ff-text-2)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">{markedDone ? <><circle cx="12" cy="12" r="9" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></> : <polyline points="20 6 9 17 4 12" />}</svg>
+          {markedDone ? "Desmarcar como hecha" : "Marcar rutina como hecha"}
+        </button>
       </div>
     </div>
   );
@@ -841,27 +1053,11 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
 
         {/* Subscription */}
         <ProfileSectionLabel>Suscripción</ProfileSectionLabel>
-        <Card padding="0" style={{ borderColor: "rgba(46,207,122,0.3)" }}>
-          <div style={{ padding: 16 }}>
-            <Badge tone="active" dot>Activo</Badge>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 14 }}>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>Generación actual</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, color: "var(--ff-text)" }}>Generación X</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>Vence</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, color: "var(--ff-red-light)" }}>20 de marzo de 2026</span>
-            </div>
-          </div>
-          <div style={{ padding: "14px 16px", borderTop: "1px solid var(--ff-border)", background: "var(--ff-surface-2)" }}>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", lineHeight: 1.5, margin: "0 0 10px" }}>
-              Gestiona tu plan en <strong style={{ color: "var(--ff-text)", fontWeight: 500 }}>fitfighters.com</strong> — renovaciones, cambios de plan y más.
-            </p>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", boxSizing: "border-box", padding: "10px", background: "var(--ff-red)", borderRadius: 10, fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", cursor: "pointer" }}>
-              Ir a fitfighters.com
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-            </div>
-          </div>
+        <Card style={{ borderColor: "rgba(46,207,122,0.3)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "28px 20px" }}>
+          <Badge tone="active" dot>Activo</Badge>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0, lineHeight: 1.4 }}>
+            Gestiona tu plan en <span style={{ color: "var(--ff-red-light)" }}>fitfighters.com</span>
+          </p>
         </Card>
 
         {/* Past generations */}
@@ -1014,7 +1210,7 @@ function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = fal
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
         {/* Block type badge */}
-        <div style={{ position: "absolute", top: 14, right: 14, background: `${color}26`, borderRadius: 999, padding: "3px 9px", border: `1px solid ${color}4d` }}>
+        <div style={{ position: "absolute", top: 14, right: 14, background: `color-mix(in srgb, ${color} 15%, transparent)`, borderRadius: 999, padding: "3px 9px", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)` }}>
           <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color }}>{type}</span>
         </div>
         {paused && (
@@ -1030,8 +1226,8 @@ function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = fal
         <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
-          <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px ${color}59` }}>{displayValue}</span>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: `${color}b3` }}>{cfg.label}</span>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
           {infoPanel}
         </div>
 
@@ -1414,7 +1610,8 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
   const programs = window.FF_DATA.programs;
   const [view, setView] = React.useState(initialView);
   const [selected, setSelected] = React.useState(initialSelectedId ? programs.find(p => p.id === initialSelectedId) || null : null);
-  const [filter, setFilter] = React.useState("all");
+  const [placeFilter, setPlaceFilter] = React.useState("all");
+  const [levelFilter, setLevelFilter] = React.useState("all");
   const [scopeDialogOpen, setScopeDialogOpen] = React.useState(initialScopeDialogOpen);
 
   if (view === "changeDays") {
@@ -1435,7 +1632,7 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
     return <ProgramDetailView program={selected} onBack={() => setView("list")} onConfirm={onConfirm} plan={plan} />;
   }
 
-  const visible = filter === "all" ? programs : programs.filter(p => p.category === filter);
+  const visible = programs.filter(p => (placeFilter === "all" || p.category === placeFilter) && (levelFilter === "all" || p.levelTag === levelFilter));
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar plan">
@@ -1465,12 +1662,23 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
           </div>
         </div>
 
-        {/* Filter + list */}
+        {/* Nivel + lugar de entrenamiento */}
         <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" }}>Planes disponibles</p>
-        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {[["all", "Todos"], ["gym", "Gym"], ["home", "Hogar"]].map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} style={{ padding: "6px 14px", borderRadius: 999, border: "1px solid", borderColor: filter === k ? "var(--ff-red)" : "var(--ff-border)", background: filter === k ? "var(--ff-red)" : "var(--ff-surface)", color: filter === k ? "#fff" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{l}</button>
-          ))}
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "0 0 8px" }}>Nivel</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[["all", "Todos"], ["fundamentos", "Fundamentos"], ["principiante", "Principiante"], ["avanzado", "Avanzado"]].map(([k, l]) => (
+              <Chip key={k} selected={levelFilter === k} onClick={() => setLevelFilter(k)}>{l}</Chip>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "0 0 8px" }}>Lugar de entrenamiento</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["all", "Todos"], ["gym", "Gym"], ["home", "Casa"]].map(([k, l]) => (
+              <Chip key={k} selected={placeFilter === k} onClick={() => setPlaceFilter(k)}>{l}</Chip>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1884,6 +2092,7 @@ function Catalog() {
       title: "Onboarding",
       cells: [
         { label: "Datos personales", el: <OnboardingScreen initialStep={0} onBack={noop} onComplete={noop} /> },
+        { label: "Datos personales", note: "Medidas fuera de rango", el: <OnboardingScreen initialStep={0} initialHeight="95" initialWeight="15" onBack={noop} onComplete={noop} /> },
         { label: "Nivel de experiencia", el: <OnboardingScreen initialStep={1} onBack={noop} onComplete={noop} /> },
         { label: "Grupos musculares", el: <OnboardingScreen initialStep={2} initialExperienceLevel="advanced" onBack={noop} onComplete={noop} /> },
         { label: "Objetivo", el: <OnboardingScreen initialStep={2} onBack={noop} onComplete={noop} /> },
@@ -1906,6 +2115,11 @@ function Catalog() {
         { label: "Rutina semanal", note: "statusAction: ready_unavailable", el: <WorkoutScreen bannerVariant="ready_unavailable" tab="workout" onTab={noop} onSelectDay={noop} /> },
         { label: "Rutina semanal", note: "statusAction: future_subscription", el: <WorkoutScreen bannerVariant="future_subscription" tab="workout" onTab={noop} onSelectDay={noop} /> },
         { label: "Rutina semanal", note: "statusAction: select_next_program", el: <WorkoutScreen bannerVariant="select_next_program" tab="workout" onTab={noop} onSelectDay={noop} /> },
+      ],
+    },
+    {
+      title: "Detalle de rutina",
+      cells: [
         { label: "Detalle de rutina", note: "Hoy", el: <WorkoutDetailScreen item={today} onBack={noop} onStart={noop} /> },
         { label: "Detalle de rutina", note: "Día completado", el: <WorkoutDetailScreen item={done} onBack={noop} onStart={noop} /> },
       ],

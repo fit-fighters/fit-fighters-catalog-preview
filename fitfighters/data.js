@@ -11,6 +11,7 @@ window.FF_DATA = {
     planProgress: 50, // avance esperado del plan (barra de fondo)
     day: "Martes — Pecho y tríceps",
     weekStartDate: "2026-07-06", // lunes de la semana actual (program.week) — ISO, para derivar fechas por día
+    isFreePlan: true, // plan gratuito de 4 semanas — habilita la acción de reinicio en Workout
   },
 
   // Rutina semanal recurrente. status aplica solo a la semana actual (program.week);
@@ -47,6 +48,55 @@ window.FF_DATA = {
     { type: "cardio",   name: "Cardio 1",   meta: "8:20",      exercises: ["Trote continuo"] },
   ],
 
+  // Detalle de rutina — modelo completo por bloque/ejercicio (paridad con FFSectionCard.kt / ExerciseItem.kt).
+  // Los bloques "cycle" usan la nomenclatura "Bloque N"; los demás tipos conservan su propio nombre.
+  routineDetailBlocks: [
+    {
+      type: "cycle", name: "Bloque 1", series: 3, restBetweenSeriesSeconds: 60,
+      exercises: [
+        { name: "Press de banca inclinado con mancuernas", desc: { kind: "repeats", reps: 10, rir: 2 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+        { name: "Aperturas con mancuernas en banco plano", desc: { kind: "repeats", reps: 12, rir: 0 }, rest: "60 seg.", img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+        { name: "Plancha frontal", desc: { kind: "time", time: "30", unit: "seg" }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+    { type: "rest", timeSeconds: 90 },
+    {
+      type: "stripset", name: "Stripset 1", series: 5, restBetweenSeriesSeconds: 45,
+      exercises: [
+        { name: "Extensión de tríceps en polea", desc: { kind: "stripset", reps: [15, 12, 10, 8, 6], rir: 2 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+        { name: "Curl de bíceps con barra", desc: { kind: "stripset", reps: [15, 12, 10, 8, 6] }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+    { type: "rest", timeSeconds: 60 },
+    {
+      type: "fortime", name: "For time 1", rounds: 4, hint: "Completa el circuito lo más rápido posible",
+      exercises: [
+        { name: "Fondos en banco", desc: { kind: "repeats", reps: 12 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+        { name: "Flexiones", desc: { kind: "repeats", reps: 15 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+    { type: "rest", timeSeconds: 90 },
+    {
+      type: "amrap", name: "Amrap 1", totalTimeSeconds: 480,
+      exercises: [
+        { name: "Burpees", desc: { kind: "repeats", reps: 15 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+        { name: "Mountain climbers", desc: { kind: "time", time: "20", unit: "seg" }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+    {
+      type: "emom", name: "Emom 1", repsIncrement: 2,
+      exercises: [
+        { name: "Press con barra", desc: { kind: "emom", initial: 1, increment: 2 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+      ],
+    },
+    {
+      type: "cardio", name: "Cardio 1", totalTimeSeconds: 500,
+      exercises: [
+        { name: "Trote continuo", desc: { kind: "time", time: "08:20", unit: "activo" }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+  ],
+
   summary: {
     program: "Novatos gym",
     routine: "Rutina Tradicional 1",
@@ -65,14 +115,14 @@ window.FF_DATA = {
   },
 
   programs: [
-    { id: 1, name: "Aumento de masa muscular hogareño", desc: "Diseñado para aumentar la masa muscular de forma magra sin aumentar el porcentaje de grasa.",   category: "home", levels: 3,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/staging/programs/5eeb86f7cb596824b0c7e2ff/1655878808252.jpg" },
-    { id: 2, name: "Entrenamiento con tu propio peso",  desc: "Entrena con tu propio peso corporal sin necesidad de equipamiento adicional.",                     category: "home", levels: 4,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648024721296.jpg" },
-    { id: 3, name: "Novatos hogareños",                 desc: "Para personas con poca o nula experiencia que quieren entrenar desde su hogar.",                   category: "home", levels: 2,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648026106702.jpg" },
-    { id: 4, name: "Prueba Beta 2.0",                   desc: "Programa de hipertrofia de alta intensidad diseñado para usuarios beta de la nueva app.",          category: "gym",  levels: 12, img: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/1Cntax90vQ-programa%20beta.png" },
-    { id: 5, name: "Pérdida de grasa",                  desc: "Pierde la mayor cantidad de grasa posible en el menor tiempo sin perder masa muscular.",           category: "home", levels: 6,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1646898005757.jpg" },
-    { id: 6, name: "Recomposición corporal",            desc: "Pierde esa última capa de grasa mientras aumentas tu masa muscular.",                              category: "gym",  levels: 8,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1646896097969.jpg" },
-    { id: 7, name: "Pérdida de grasa hogareño",         desc: "Lo mismo que pérdida de grasa, pero desde la comodidad de tu hogar.",                             category: "home", levels: 2,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648025172566.jpg" },
-    { id: 8, name: "Recomposición corporal hogareño",   desc: "Pierde grasa y gana músculo desde la comodidad de tu hogar.",                                     category: "home", levels: 5,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648024087598.jpg" },
+    { id: 1, name: "Aumento de masa muscular hogareño", desc: "Diseñado para aumentar la masa muscular de forma magra sin aumentar el porcentaje de grasa.",   category: "home", levelTag: "fundamentos", levels: 3,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/staging/programs/5eeb86f7cb596824b0c7e2ff/1655878808252.jpg" },
+    { id: 2, name: "Entrenamiento con tu propio peso",  desc: "Entrena con tu propio peso corporal sin necesidad de equipamiento adicional.",                     category: "home", levelTag: "principiante", levels: 4,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648024721296.jpg" },
+    { id: 3, name: "Novatos hogareños",                 desc: "Para personas con poca o nula experiencia que quieren entrenar desde su hogar.",                   category: "home", levelTag: "fundamentos", levels: 2,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648026106702.jpg" },
+    { id: 4, name: "Prueba Beta 2.0",                   desc: "Programa de hipertrofia de alta intensidad diseñado para usuarios beta de la nueva app.",          category: "gym",  levelTag: "avanzado", levels: 12, img: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/1Cntax90vQ-programa%20beta.png" },
+    { id: 5, name: "Pérdida de grasa",                  desc: "Pierde la mayor cantidad de grasa posible en el menor tiempo sin perder masa muscular.",           category: "home", levelTag: "principiante", levels: 6,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1646898005757.jpg" },
+    { id: 6, name: "Recomposición corporal",            desc: "Pierde esa última capa de grasa mientras aumentas tu masa muscular.",                              category: "gym",  levelTag: "avanzado", levels: 8,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1646896097969.jpg" },
+    { id: 7, name: "Pérdida de grasa hogareño",         desc: "Lo mismo que pérdida de grasa, pero desde la comodidad de tu hogar.",                             category: "home", levelTag: "fundamentos", levels: 2,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648025172566.jpg" },
+    { id: 8, name: "Recomposición corporal hogareño",   desc: "Pierde grasa y gana músculo desde la comodidad de tu hogar.",                                     category: "home", levelTag: "principiante", levels: 5,  img: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1648024087598.jpg" },
   ],
 
   recommendedProgram: {
