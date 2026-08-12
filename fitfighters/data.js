@@ -97,6 +97,123 @@ window.FF_DATA = {
     },
   ],
 
+  // Detalle de ejercicio + cambio de ejercicio — paridad con ExerciseDetailScreen.kt / ChangeExerciseBottomSheet.kt.
+  // Claves = nombre del ejercicio tal como aparece en routineDetailBlocks.
+  exerciseLibrary: {
+    "Press de banca inclinado con mancuernas": {
+      muscles: ["Pecho", "Hombro frontal", "Tríceps"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+      instructions: [
+        "Ajusta el banco a 30-45° y siéntate con una mancuerna en cada mano apoyada sobre los muslos.",
+        "Recuéstate y lleva las mancuernas a la altura del pecho, con los codos ligeramente hacia afuera.",
+        "Empuja las mancuernas hacia arriba hasta extender los brazos sin bloquear los codos.",
+        "Baja de forma controlada hasta sentir el estiramiento en el pecho y repite.",
+      ],
+    },
+    "Aperturas con mancuernas en banco plano": {
+      muscles: ["Pecho", "Hombro frontal"],
+      videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+      instructions: [
+        "Recuéstate en un banco plano con una mancuerna en cada mano, brazos extendidos sobre el pecho.",
+        "Con un ligero doblez en los codos, abre los brazos hacia los lados hasta sentir el estiramiento en el pecho.",
+        "Regresa las mancuernas al punto de partida contrayendo el pecho, sin golpearlas entre sí.",
+      ],
+    },
+    "Plancha frontal": {
+      muscles: ["Core", "Abdomen", "Espalda baja"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+      instructions: [
+        "Apóyate sobre los antebrazos y la punta de los pies, formando una línea recta de cabeza a talones.",
+        "Contrae el abdomen y los glúteos para evitar que la cadera caiga o suba.",
+        "Mantén la posición respirando de forma constante durante el tiempo indicado.",
+      ],
+    },
+    "Extensión de tríceps en polea": {
+      muscles: ["Tríceps"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+      instructions: [
+        "Sujeta la barra o cuerda de la polea alta con ambas manos, codos pegados al torso.",
+        "Extiende los antebrazos hacia abajo sin mover los codos del cuerpo.",
+        "Regresa de forma controlada hasta la posición inicial sin perder la tensión.",
+      ],
+    },
+    "Curl de bíceps con barra": {
+      muscles: ["Bíceps", "Antebrazo"],
+      videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+      instructions: [
+        "Toma la barra con agarre supino, separación de manos al ancho de los hombros.",
+        "Flexiona los codos llevando la barra hacia el pecho, manteniéndolos fijos junto al torso.",
+        "Baja la barra de forma controlada hasta extender los brazos por completo.",
+      ],
+    },
+    "Fondos en banco": {
+      muscles: ["Tríceps", "Hombro frontal", "Pecho"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+      instructions: [
+        "Coloca las manos en el borde de un banco, piernas extendidas al frente y talones en el piso.",
+        "Flexiona los codos y baja la cadera hasta formar un ángulo de 90° en los brazos.",
+        "Empuja hacia arriba extendiendo los codos sin bloquearlos.",
+      ],
+    },
+    "Flexiones": {
+      muscles: ["Pecho", "Tríceps", "Core"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+      instructions: [
+        "Colócate en posición de plancha con las manos un poco más anchas que los hombros.",
+        "Baja el cuerpo en línea recta hasta que el pecho casi toque el piso.",
+        "Empuja hacia arriba hasta extender los brazos por completo.",
+      ],
+    },
+    "Burpees": {
+      muscles: ["Cuerpo completo"],
+      videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+      instructions: [
+        "Desde de pie, baja a cuclillas y apoya las manos en el piso.",
+        "Lleva los pies hacia atrás hasta quedar en plancha y realiza una flexión.",
+        "Regresa los pies hacia las manos y salta extendiendo los brazos por encima de la cabeza.",
+      ],
+    },
+    "Mountain climbers": {
+      muscles: ["Core", "Cuádriceps"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+      instructions: [
+        "Colócate en posición de plancha alta con los brazos extendidos.",
+        "Lleva una rodilla hacia el pecho y regresa, alternando las piernas rápidamente.",
+        "Mantén la cadera baja y el core contraído durante todo el movimiento.",
+      ],
+    },
+    "Press con barra": {
+      muscles: ["Hombro frontal", "Tríceps"],
+      videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+      instructions: [
+        "Sujeta la barra a la altura de los hombros con agarre firme, un poco más ancho que los hombros.",
+        "Empuja la barra hacia arriba hasta extender los brazos por completo.",
+        "Baja de forma controlada hasta la posición inicial y repite.",
+      ],
+    },
+    "Trote continuo": {
+      muscles: ["Cuádriceps", "Pantorrillas", "Femoral"],
+      videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+      instructions: [
+        "Mantén un ritmo constante y una postura erguida durante todo el trote.",
+        "Respira de forma controlada y ajusta la velocidad si es necesario.",
+        "Reduce el ritmo poco a poco en los últimos segundos para terminar de forma segura.",
+      ],
+    },
+  },
+
+  // Pool de ejercicios relacionados para la pantalla "Cambiar ejercicio" (ChangeExerciseBottomSheet.kt → misma familia/tags).
+  changeExercisePool: [
+    { name: "Press militar con mancuernas", muscles: ["Hombro frontal", "Tríceps"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg", videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4" },
+    { name: "Press de pecho mancuernas en banco inclinado", muscles: ["Pecho", "Hombro frontal"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg", videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4" },
+    { name: "Curl de bíceps en polea", muscles: ["Bíceps"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg", videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4" },
+    { name: "Elevaciones laterales", muscles: ["Hombro medio"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg", videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4" },
+    { name: "Plancha lateral", muscles: ["Oblicuos", "Core"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg", videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4" },
+    { name: "Sentadilla búlgara", muscles: ["Cuádriceps", "Glúteo"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg", videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4" },
+    { name: "Puente de glúteo", muscles: ["Glúteo", "Femoral"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg", videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4" },
+    { name: "Salto de cuerda", muscles: ["Pantorrillas", "Cuerpo completo"], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg", videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4" },
+  ],
+
   summary: {
     program: "Novatos gym",
     routine: "Rutina Tradicional 1",

@@ -582,10 +582,10 @@ function ExerciseDescriptionView({ desc }) {
   return null;
 }
 
-function RoutineExerciseRow({ ex, isLast }) {
+function RoutineExerciseRow({ ex, isLast, onTap }) {
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px" }}>
+      <div onClick={onTap} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", cursor: onTap ? "pointer" : "default" }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
           {ex.img ? <img src={ex.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
         </div>
@@ -638,7 +638,7 @@ function BlockInfoStrip({ block, color }) {
   return rows.length ? <>{rows}</> : null;
 }
 
-function RoutineSectionCard({ block, defaultOpen }) {
+function RoutineSectionCard({ block, defaultOpen, onExerciseTap }) {
   const [open, setOpen] = React.useState(!!defaultOpen);
   const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
   const meta = block.type === "fortime" ? (block.rounds ? `${block.rounds} rondas` : null) : (block.series ? `${block.series} series` : null);
@@ -660,7 +660,7 @@ function RoutineSectionCard({ block, defaultOpen }) {
       {open && (
         <div>
           <BlockInfoStrip block={block} color={color} />
-          {block.exercises.map((ex, i) => <RoutineExerciseRow key={i} ex={ex} isLast={i === block.exercises.length - 1} />)}
+          {block.exercises.map((ex, i) => <RoutineExerciseRow key={i} ex={ex} isLast={i === block.exercises.length - 1} onTap={onExerciseTap ? () => onExerciseTap(ex) : undefined} />)}
         </div>
       )}
     </div>
@@ -967,13 +967,13 @@ window.WorkoutScreen = WorkoutScreen;
 // ── WorkoutDetail.jsx ───────────────────────────────────────────
 // FitFighters mobile — Routine detail for a tapped day (sections + start CTA).
 
-function WorkoutDetailScreen({ item, onBack, onStart }) {
+function WorkoutDetailScreen({ item, onBack, onStart, blocksOverride, onExerciseTap }) {
   const d = window.FF_DATA;
   const day = item || { day: "Hoy", routine: d.program.day };
   const isToday = day.status === "today";
   const isDone = day.status === "done";
   const [markedDone, setMarkedDone] = React.useState(isDone);
-  const blocks = d.routineDetailBlocks || [];
+  const blocks = blocksOverride || d.routineDetailBlocks || [];
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Detalle rutina">
@@ -992,7 +992,7 @@ function WorkoutDetailScreen({ item, onBack, onStart }) {
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", lineHeight: 1.2, letterSpacing: "-.3px", margin: "0 2px 18px" }}>{day.routine}</h1>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {blocks.map((b, i) => b.type === "rest" ? <RoutineRestStrip key={i} block={b} /> : <RoutineSectionCard key={i} block={b} defaultOpen={i === 0} />)}
+          {blocks.map((b, i) => b.type === "rest" ? <RoutineRestStrip key={i} block={b} /> : <RoutineSectionCard key={i} block={b} defaultOpen={i === 0} onExerciseTap={onExerciseTap ? (ex) => onExerciseTap(ex, i) : undefined} />)}
         </div>
       </div>
 
@@ -1012,6 +1012,143 @@ function WorkoutDetailScreen({ item, onBack, onStart }) {
 }
 
 window.WorkoutDetailScreen = WorkoutDetailScreen;
+
+// ── ExerciseDetail.jsx ────────────────────────────────────────────
+// FitFighters mobile — Exercise detail: video, muscles, instructions. Paridad con ExerciseDetailScreen.kt.
+
+function getExerciseInfo(name) {
+  return (window.FF_DATA.exerciseLibrary || {})[name] || { muscles: [], instructions: [], videoUrl: null };
+}
+
+function ExerciseDetailScreen({ exercise, onBack, onChangeExercise }) {
+  const ex = exercise || { name: "Ejercicio", img: null };
+  const info = getExerciseInfo(ex.name);
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Detalle de ejercicio">
+      <AppBar variant="title" title={ex.name} showBack onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ width: "100%", height: 220, background: "#000" }}>
+          {info.videoUrl ? (
+            <video key={info.videoUrl} src={info.videoUrl} poster={ex.img} controls loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+          ) : ex.img ? (
+            <img src={ex.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)" }}>Video no disponible</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "18px 16px 8px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {info.muscles.length > 0 && (
+            <div>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: "0 0 6px" }}>Músculos</p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0, lineHeight: 1.5 }}>{info.muscles.join(", ")}</p>
+            </div>
+          )}
+          {info.instructions.length > 0 && (
+            <div>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: "0 0 8px" }}>Instrucciones</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {info.instructions.map((step, i) => (
+                  <p key={i} style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0, lineHeight: 1.5 }}>{i + 1}. {step}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)" }}>
+        <Button variant="primary" onClick={onChangeExercise}>Cambiar ejercicio</Button>
+      </div>
+    </div>
+  );
+}
+
+window.ExerciseDetailScreen = ExerciseDetailScreen;
+
+// ── ChangeExercise.jsx ────────────────────────────────────────────
+// FitFighters mobile — Change exercise: player up top, alternatives list below, tap-to-preview then confirm.
+
+function ChangeExerciseRow({ item, isCurrent, isSelected, onTap }) {
+  return (
+    <div
+      onClick={isCurrent ? undefined : onTap}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+        cursor: isCurrent ? "default" : "pointer",
+        background: isSelected ? "rgba(255,50,0,0.08)" : "transparent",
+        borderLeft: isSelected ? "2px solid var(--ff-red)" : "2px solid transparent",
+        opacity: isCurrent ? 0.5 : 1,
+      }}
+    >
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
+        {item.img ? <img src={item.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{item.name}</p>
+        {item.muscles && <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "3px 0 0" }}>{item.muscles.join(", ")}</p>}
+      </div>
+      {isCurrent && <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--ff-text-3)", background: "var(--ff-surface-2)", padding: "2px 7px", borderRadius: 999, flexShrink: 0 }}>ACTUAL</span>}
+      {isSelected && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12" /></svg>}
+    </div>
+  );
+}
+
+function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
+  const ex = exercise || { name: "Ejercicio", img: null };
+  const info = getExerciseInfo(ex.name);
+  const pool = poolOverride || window.FF_DATA.changeExercisePool || [];
+  const relatedPool = pool.filter(p => p.name !== ex.name);
+  const [selected, setSelected] = React.useState(null);
+  const preview = selected || { name: ex.name, img: ex.img, videoUrl: info.videoUrl };
+
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar ejercicio">
+      <AppBar variant="title" title="Cambiar ejercicio" showBack onBack={onBack} />
+
+      <div style={{ width: "100%", height: 200, background: "#000", flexShrink: 0, position: "relative" }}>
+        {preview.videoUrl ? (
+          <video key={preview.videoUrl} src={preview.videoUrl} poster={preview.img} controls autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+        ) : preview.img ? (
+          <img src={preview.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : null}
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "18px 16px 8px", background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)", pointerEvents: "none" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "#fff", margin: 0 }}>{preview.name}</p>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "8px 16px 4px" }}>Ejercicios relacionados</p>
+        <ChangeExerciseRow item={{ name: ex.name, img: ex.img }} isCurrent />
+        <div style={{ borderTop: "1px solid var(--ff-border)" }} />
+        {relatedPool.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "36px 20px" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            </div>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0 }}>No hay ejercicios disponibles</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0, lineHeight: 1.5, maxWidth: 260 }}>No encontramos alternativas para este ejercicio por ahora.</p>
+          </div>
+        ) : relatedPool.map((item, i) => (
+          <React.Fragment key={item.name}>
+            <ChangeExerciseRow item={item} isSelected={selected?.name === item.name} onTap={() => setSelected(item)} />
+            <div style={{ borderTop: "1px solid var(--ff-border)" }} />
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)" }}>
+        <Button variant="primary" disabled={!selected} onClick={() => selected && onConfirm(selected)}>
+          {selected ? `Cambiar a ${selected.name}` : "Selecciona un ejercicio"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+window.ChangeExerciseScreen = ChangeExerciseScreen;
 
 // ── Profile.jsx ─────────────────────────────────────────────────
 // FitFighters mobile — Profile screen.
@@ -1955,6 +2092,8 @@ function App() {
   const [screen, setScreen] = React.useState("login");
   const [tab, setTab] = React.useState("workout");
   const [selectedDay, setSelectedDay] = React.useState(null);
+  const [blocks, setBlocks] = React.useState(() => JSON.parse(JSON.stringify(window.FF_DATA.routineDetailBlocks || [])));
+  const [activeExercise, setActiveExercise] = React.useState(null); // { ex, blockIndex }
 
   const nav = {
     login:             () => { setTab("workout"); setScreen("workout"); },
@@ -1963,6 +2102,8 @@ function App() {
     recommended:       () => setScreen("recommended"),
     workout:           () => { setTab("workout"); setScreen("workout"); },
     workoutDetail:     (day) => { setSelectedDay(day); setScreen("workoutDetail"); },
+    exerciseDetail:    (ex, blockIndex) => { setActiveExercise({ ex, blockIndex }); setScreen("exerciseDetail"); },
+    changeExercise:    () => setScreen("changeExercise"),
     trainer:           () => setScreen("trainer"),
     summary:           () => setScreen("summary"),
     milestone:         () => setScreen("milestone"),
@@ -1971,6 +2112,18 @@ function App() {
     changePassword:    () => setScreen("changePassword"),
     changeProgram:     () => setScreen("changeProgram"),
     generationHistory: () => setScreen("generationHistory"),
+  };
+
+  const onExerciseChanged = (newItem) => {
+    setBlocks(prev => {
+      const next = [...prev];
+      const block = { ...next[activeExercise.blockIndex] };
+      block.exercises = block.exercises.map(e => e === activeExercise.ex ? { ...e, name: newItem.name, img: newItem.img } : e);
+      next[activeExercise.blockIndex] = block;
+      return next;
+    });
+    setActiveExercise(null);
+    setScreen("workoutDetail");
   };
 
   const onTab = (t) => {
@@ -1997,7 +2150,13 @@ function App() {
       body = <WorkoutScreen tab={tab} onTab={onTab} onSelectDay={nav.workoutDetail} />;
       break;
     case "workoutDetail":
-      body = <WorkoutDetailScreen item={selectedDay} onBack={nav.workout} onStart={nav.trainer} />;
+      body = <WorkoutDetailScreen item={selectedDay} onBack={nav.workout} onStart={nav.trainer} blocksOverride={blocks} onExerciseTap={nav.exerciseDetail} />;
+      break;
+    case "exerciseDetail":
+      body = <ExerciseDetailScreen exercise={activeExercise?.ex} onBack={nav.workoutDetail ? () => setScreen("workoutDetail") : nav.workout} onChangeExercise={nav.changeExercise} />;
+      break;
+    case "changeExercise":
+      body = <ChangeExerciseScreen exercise={activeExercise?.ex} onBack={() => setScreen("exerciseDetail")} onConfirm={onExerciseChanged} />;
       break;
     case "profile":
       body = <ProfileScreen tab={tab} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} onGenerations={nav.generationHistory} />;
@@ -2125,6 +2284,14 @@ function Catalog() {
       ],
     },
     {
+      title: "Detalle de ejercicio",
+      cells: [
+        { label: "Detalle de ejercicio", note: "Con músculos e instrucciones", el: <ExerciseDetailScreen exercise={window.FF_DATA.routineDetailBlocks[0].exercises[0]} onBack={noop} onChangeExercise={noop} /> },
+        { label: "Cambiar ejercicio", note: "Sin selección", el: <ChangeExerciseScreen exercise={window.FF_DATA.routineDetailBlocks[0].exercises[0]} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar ejercicio", note: "Sin ejercicios relacionados", el: <ChangeExerciseScreen exercise={{ name: "Ejercicio sin alternativas", img: null }} poolOverride={[]} onBack={noop} onConfirm={noop} /> },
+      ],
+    },
+    {
       title: "Entrenador virtual",
       cells: [
         { label: "Cycle", el: <TrainerScreen initialIndex={0} onExit={noop} onFinish={noop} /> },
@@ -2190,3 +2357,4 @@ function Catalog() {
 }
 
 window.Catalog = Catalog;
+
