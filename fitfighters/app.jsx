@@ -1110,7 +1110,7 @@ function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
 
       <div style={{ width: "100%", height: 200, background: "#000", flexShrink: 0, position: "relative" }}>
         {preview.videoUrl ? (
-          <video key={preview.videoUrl} src={preview.videoUrl} poster={preview.img} controls autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+          <video key={preview.videoUrl} src={preview.videoUrl} poster={preview.img} controls loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
         ) : preview.img ? (
           <img src={preview.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : null}
@@ -1254,6 +1254,176 @@ const SECTION_CFG = {
   cardio:   { label: "Tiempo activo",   bgTint: "rgba(77,166,255,0.04)",  isTime: true  },
 };
 
+const PAUSE_TABS = [
+  { id: "pausa", label: "Pausa" },
+  { id: "cola", label: "Cola" },
+  { id: "instrucciones", label: "Instrucciones" },
+];
+
+function groupIntoBlocks(ex) {
+  const blocks = [];
+  ex.forEach((item) => {
+    if (item.type === "rest") {
+      const last = blocks[blocks.length - 1];
+      if (last) last.rest = item;
+      return;
+    }
+    const last = blocks[blocks.length - 1];
+    const sameBlock = last && !last.rest && (item.type === "cycle" || item.type === "stripset") && last.items[0].type === item.type;
+    if (sameBlock) last.items.push(item);
+    else blocks.push({ id: `blk-${blocks.length}`, items: [item], rest: null });
+  });
+  return blocks;
+}
+
+function blockSubtitle(items) {
+  const first = items[0];
+  if (first.type === "cycle" || first.type === "stripset") return `${items.length > 1 ? items.length + " ejercicios · " : ""}serie ${first.serie}/${first.total}`;
+  if (first.type === "emom") return `${first.time} · minuto ${first.minCurrent || 1}/${first.minTotal || 1}`;
+  if (first.type === "rest") return `Descanso ${first.time}`;
+  return first.time || "";
+}
+
+function TrainerTabBar({ active, onChange, color }) {
+  return (
+    <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
+      {PAUSE_TABS.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)} style={{ flex: 1, padding: "10px 0", background: "none", border: "none", borderBottom: active === t.id ? `2px solid ${color}` : "2px solid transparent", color: active === t.id ? "#fff" : "rgba(255,255,255,.45)", fontFamily: "var(--font-body)", fontSize: 12, letterSpacing: ".04em", textTransform: "uppercase", cursor: "pointer" }}>{t.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function TrainerThumb({ img, size }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 8, overflow: "hidden", background: "var(--ff-surface-2, #1a1a1a)", flexShrink: 0 }}>
+      {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+    </div>
+  );
+}
+
+function TrainerQueueRow({ block, isExpanded, onToggleExpand, onPostpone, onDragStart, onDragOver, onDrop }) {
+  const first = block.items[0];
+  return (
+    <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
+        <span style={{ cursor: "grab", color: "rgba(255,255,255,.35)", display: "flex", flexShrink: 0 }} title="Arrastra para reordenar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
+        </span>
+        <div onClick={onToggleExpand} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+          <SectionBadge type={first.type} showLabel={false} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3 }}>{first.name}</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: ".03em" }}>{blockSubtitle(block.items)}</p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2" style={{ flexShrink: 0, transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
+        </div>
+        <button onClick={onPostpone} title="Posponer para el final de la cola" style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.65)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></svg>
+        </button>
+      </div>
+      {block.rest && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 0 10px 26px" }}>
+          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.3)", flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)" }}>Descanso · {block.rest.time}</span>
+        </div>
+      )}
+      {isExpanded && (
+        <div style={{ padding: "0 0 12px 26px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {block.items.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TrainerThumb img={it.img} size={26} />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.7)", flex: 1, minWidth: 0, lineHeight: 1.4 }}>{it.name}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)", flexShrink: 0 }}>{it.type === "rest" ? it.time : it.reps ? `${it.reps} reps` : it.time}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrainerQueueTab({ queue, expandedId, onToggleExpand, onPostpone, onReorder }) {
+  const dragIndex = React.useRef(null);
+  if (queue.length === 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "36px 4px" }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+        </div>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "#fff", margin: 0 }}>No hay ejercicios disponibles</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.4)", margin: 0, lineHeight: 1.5, maxWidth: 240 }}>Ya completaste todos los bloques de esta rutina.</p>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {queue.map((block, i) => (
+        <TrainerQueueRow
+          key={block.id}
+          block={block}
+          isExpanded={expandedId === block.id}
+          onToggleExpand={() => onToggleExpand(expandedId === block.id ? null : block.id)}
+          onPostpone={() => onPostpone(block.id)}
+          onDragStart={() => { dragIndex.current = i; }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => { if (dragIndex.current !== null) onReorder(dragIndex.current, i); dragIndex.current = null; }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TrainerInstructionsTab({ exercise, onWatchVideo }) {
+  const ex = exercise || {};
+  const instructions = ex.instructions || [];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "#fff", margin: 0, textAlign: "center" }}>{ex.name}</p>
+      {instructions.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {instructions.map((step, i) => (
+            <p key={i} style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.7)", margin: 0, lineHeight: 1.6 }}>{i + 1}. {step}</p>
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.4)", margin: 0, textAlign: "center", padding: "20px 0" }}>Sin instrucciones para este bloque.</p>
+      )}
+      <div style={{ marginTop: 4, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.5)", margin: 0, textAlign: "center" }}>¿Aún tienes problemas? Ve el video explicativo</p>
+        <button onClick={onWatchVideo} style={{ width: "100%", padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><polygon points="6 4 20 12 6 20 6 4" /></svg>
+          Ver video
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TrainerVideoScreen({ exercise, onClose }) {
+  const ex = exercise || {};
+  return (
+    <div style={{ position: "absolute", inset: 0, background: "#000", zIndex: 50, display: "flex", flexDirection: "column" }} data-screen-label="Video explicativo">
+      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {ex.videoUrl ? (
+          <video key={ex.videoUrl} src={ex.videoUrl} poster={ex.img} controls playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} onEnded={onClose} />
+        ) : (
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.5)" }}>Video no disponible</span>
+        )}
+        <button onClick={onClose} style={{ position: "absolute", top: 14, left: 14, width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.55)", borderRadius: 999, padding: "4px 10px", border: "1px solid rgba(255,255,255,0.15)" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /></svg>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Pantalla completa</span>
+        </div>
+      </div>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", textAlign: "center", margin: 0, padding: "12px 20px 20px", background: "#000" }}>{ex.name}</p>
+    </div>
+  );
+}
+
 function TrainerPanelItem({ value, label }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 22px" }}>
@@ -1280,16 +1450,24 @@ function TrainerCtrlBtn({ children, label, primary, danger, color, onClick }) {
   );
 }
 
-function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = false }) {
+function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = false, initialPauseTab = "pausa" }) {
   const ex = window.FF_DATA.exercises;
   const [idx, setIdx] = React.useState(initialIndex);
   const [paused, setPaused] = React.useState(initialPaused);
   const [elapsed, setElapsed] = React.useState(0);
+  const [pauseTab, setPauseTab] = React.useState(initialPauseTab);
+  const [queue, setQueue] = React.useState(() => groupIntoBlocks(ex));
+  const [expandedBlockId, setExpandedBlockId] = React.useState(null);
+  const [showVideo, setShowVideo] = React.useState(false);
+
+  const postponeBlock = (id) => setQueue(q => { const b = q.find(x => x.id === id); return b ? [...q.filter(x => x.id !== id), b] : q; });
+  const reorderQueue = (from, to) => setQueue(q => { if (from === to) return q; const copy = q.slice(); const [moved] = copy.splice(from, 1); copy.splice(to, 0, moved); return copy; });
 
   React.useEffect(() => {
+    if (paused) return;
     const t = setInterval(() => setElapsed(s => s + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [paused]);
 
   const fmtElapsed = (s) => {
     const h = Math.floor(s / 3600);
@@ -1311,7 +1489,7 @@ function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = fal
 
   // Info panel varies by block type
   let infoPanel = null;
-  if (!paused) {
+  {
     if (type === "cycle" || type === "stripset") {
       infoPanel = (
         <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 6 }}>
@@ -1359,21 +1537,24 @@ function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = fal
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "20px 20px", gap: 16, background: cfg.bgTint }}>
-        <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
-          <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
-          {infoPanel}
-        </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "20px 20px", gap: 16, background: cfg.bgTint, minHeight: 0 }}>
+        {!paused && (
+          <>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
+              {infoPanel}
+            </div>
+          </>
+        )}
 
         {!paused ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <TrainerCtrlBtn label="Anterior" color={color} onClick={prev}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>
             </TrainerCtrlBtn>
-            <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => setPaused(true)}>
+            <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => { setPaused(true); setPauseTab("pausa"); }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             </TrainerCtrlBtn>
             <TrainerCtrlBtn label="Siguiente" color={color} onClick={next}>
@@ -1384,12 +1565,32 @@ function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = fal
             </TrainerCtrlBtn>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Button variant="primary" onClick={() => setPaused(false)}>Reanudar</Button>
-            <button onClick={onFinish} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Detener</button>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <TrainerTabBar active={pauseTab} onChange={setPauseTab} color={color} />
+            <div style={{ flex: 1, overflowY: "auto", padding: "14px 0 4px" }}>
+              {pauseTab === "pausa" && (
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: 360 }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
+                    {infoPanel}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <Button variant="primary" onClick={() => setPaused(false)}>Reanudar</Button>
+                    <button onClick={onFinish} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Detener</button>
+                  </div>
+                </div>
+              )}
+              {pauseTab === "cola" && (
+                <TrainerQueueTab queue={queue} expandedId={expandedBlockId} onToggleExpand={setExpandedBlockId} onPostpone={postponeBlock} onReorder={reorderQueue} />
+              )}
+              {pauseTab === "instrucciones" && <TrainerInstructionsTab exercise={cur} onWatchVideo={() => setShowVideo(true)} />}
+            </div>
           </div>
         )}
       </div>
+      {showVideo && <TrainerVideoScreen exercise={cur} onClose={() => setShowVideo(false)} />}
     </div>
   );
 }
@@ -2302,6 +2503,8 @@ function Catalog() {
         { label: "Cardio", el: <TrainerScreen initialIndex={7} onExit={noop} onFinish={noop} /> },
         { label: "Descanso", el: <TrainerScreen initialIndex={2} onExit={noop} onFinish={noop} /> },
         { label: "En pausa", el: <TrainerScreen initialIndex={0} initialPaused={true} onExit={noop} onFinish={noop} /> },
+        { label: "Cola", el: <TrainerScreen initialIndex={0} initialPaused={true} initialPauseTab="cola" onExit={noop} onFinish={noop} /> },
+        { label: "Instrucciones", el: <TrainerScreen initialIndex={0} initialPaused={true} initialPauseTab="instrucciones" onExit={noop} onFinish={noop} /> },
       ],
     },
     {
