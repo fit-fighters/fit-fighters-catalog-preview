@@ -26,32 +26,103 @@ window.FF_DATA = {
     { day: "Domingo",   routine: "Descanso",          type: "rest",     status: "upcoming" },
   ],
 
-  // Live trainer queue — typed exercises covering all 7 block types
-  exercises: [
-    { name: "Press de pecho mancuernas en banco inclinado", type: "cycle",    reps: 15, serie: 2, total: 3,         img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Pecho", "Hombro frontal", "Tríceps"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
-      instructions: ["Ajusta el banco a 30-45° y siéntate con una mancuerna en cada mano apoyada sobre los muslos.", "Recuéstate y lleva las mancuernas a la altura del pecho, con los codos ligeramente hacia afuera.", "Empuja las mancuernas hacia arriba hasta extender los brazos sin bloquear los codos.", "Baja de forma controlada hasta sentir el estiramiento en el pecho y repite."] },
-    { name: "Aperturas con mancuernas en banco plano",      type: "cycle",    reps: 12, serie: 1, total: 3,         img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Pecho", "Hombro frontal"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
-      instructions: ["Recuéstate en un banco plano con una mancuerna en cada mano, brazos extendidos sobre el pecho.", "Con un ligero doblez en los codos, abre los brazos hacia los lados hasta sentir el estiramiento en el pecho.", "Regresa las mancuernas al punto de partida contrayendo el pecho, sin golpearlas entre sí."] },
-    { name: "Descanso activo",                              type: "rest",     time: "02:00",                        img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: [], videoUrl: null,
+  // Live trainer queue — block-shaped, one entry per section, covering all 7 behaviors.
+  // Each block carries everything TrainerScreen needs to simulate its real running behavior
+  // (timers, series/rounds, rest placement) — not just static display values.
+  trainerBlocks: [
+    {
+      id: "b-cycle", type: "cycle", name: "Bloque 1 — Pecho", series: 3, restBetweenSeconds: 20,
+      exercises: [
+        { name: "Press de pecho mancuernas en banco inclinado", mode: "reps", reps: 15, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Pecho", "Hombro frontal", "Tríceps"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+          instructions: ["Ajusta el banco a 30-45° y siéntate con una mancuerna en cada mano apoyada sobre los muslos.", "Recuéstate y lleva las mancuernas a la altura del pecho, con los codos ligeramente hacia afuera.", "Empuja las mancuernas hacia arriba hasta extender los brazos sin bloquear los codos.", "Baja de forma controlada hasta sentir el estiramiento en el pecho y repite."] },
+        { name: "Plancha frontal", mode: "time", timeSeconds: 30, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Core", "Abdomen", "Espalda baja"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Apóyate sobre los antebrazos y la punta de los pies, formando una línea recta de cabeza a talones.", "Contrae el abdomen y los glúteos para evitar que la cadera caiga o suba.", "Mantén la posición respirando de forma constante durante el tiempo indicado."] },
+      ],
+    },
+    { id: "b-rest-1", type: "rest", timeSeconds: 60,
+      img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
       instructions: ["Camina o trota suave para mantener el ritmo cardíaco activo.", "Respira profundo y relaja los grupos musculares recién trabajados.", "Prepárate para el siguiente bloque."] },
-    { name: "Flexiones explosivas — For time",              type: "fortime",  time: "00:00",                        img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Pecho", "Tríceps", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
-      instructions: ["Colócate en posición de plancha con las manos un poco más anchas que los hombros.", "Baja el cuerpo y empuja hacia arriba con fuerza hasta despegar ligeramente las manos.", "Aterriza con control y repite lo más rápido posible sin perder la técnica."] },
-    { name: "Burpees",                                      type: "amrap",    time: "08:00",                        img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Cuerpo completo"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
-      instructions: ["Desde de pie, baja a cuclillas y apoya las manos en el piso.", "Lleva los pies hacia atrás hasta quedar en plancha y realiza una flexión.", "Regresa los pies hacia las manos y salta extendiendo los brazos por encima de la cabeza."] },
-    { name: "Press con barra — EMOM",                       type: "emom",     time: "00:45", minCurrent: 3, minTotal: 7, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Hombro frontal", "Tríceps", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
-      instructions: ["Sujeta la barra al frente de los hombros con agarre prono.", "Empuja la barra por encima de la cabeza hasta extender los brazos.", "Baja con control y completa las repeticiones antes de que termine el minuto."] },
-    { name: "Curl de bíceps",                               type: "stripset", reps: 10, serie: 3, total: 5,         img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Bíceps", "Antebrazo"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
-      instructions: ["Toma la barra con agarre supino, separación de manos al ancho de los hombros.", "Flexiona los codos llevando la barra hacia el pecho, manteniéndolos fijos junto al torso.", "Baja la barra de forma controlada hasta extender los brazos por completo."] },
-    { name: "Trote continuo",                               type: "cardio",   time: "08:20",                        img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
-      muscles: ["Cuádriceps", "Pantorrillas", "Cardiovascular"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
-      instructions: ["Mantén un ritmo constante que puedas sostener durante todo el bloque.", "Cuida la postura: espalda recta, mirada al frente, brazos relajados.", "Ajusta la velocidad si necesitas recuperar el aliento sin detenerte por completo."] },
+    {
+      id: "b-stripset", type: "stripset", name: "Stripset 1", restBetweenSeconds: 30,
+      exercises: [
+        { name: "Curl de bíceps con barra", sequence: [12, 10, 8, 6], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Bíceps", "Antebrazo"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+          instructions: ["Toma la barra con agarre supino, separación de manos al ancho de los hombros.", "Flexiona los codos llevando la barra hacia el pecho, manteniéndolos fijos junto al torso.", "Baja la barra de forma controlada hasta extender los brazos por completo."] },
+      ],
+    },
+    {
+      id: "b-fortime", type: "fortime", name: "For time 1", rounds: 4,
+      exercises: [
+        { name: "Flexiones", reps: 15, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Pecho", "Tríceps", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+          instructions: ["Colócate en posición de plancha con las manos un poco más anchas que los hombros.", "Baja el cuerpo en línea recta hasta que el pecho casi toque el piso.", "Empuja hacia arriba hasta extender los brazos por completo."] },
+        { name: "Fondos en banco", reps: 12, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Tríceps", "Hombro frontal", "Pecho"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Coloca las manos en el borde de un banco, piernas extendidas al frente y talones en el piso.", "Flexiona los codos y baja la cadera hasta formar un ángulo de 90° en los brazos.", "Empuja hacia arriba extendiendo los codos sin bloquearlos."] },
+      ],
+    },
+    {
+      id: "b-amrap", type: "amrap", name: "Amrap 1", totalTimeSeconds: 90,
+      exercises: [
+        { name: "Burpees", reps: 15, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Cuerpo completo"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+          instructions: ["Desde de pie, baja a cuclillas y apoya las manos en el piso.", "Lleva los pies hacia atrás hasta quedar en plancha y realiza una flexión.", "Regresa los pies hacia las manos y salta extendiendo los brazos por encima de la cabeza."] },
+        { name: "Mountain climbers", timeSeconds: 20, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Core", "Cuádriceps"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Colócate en posición de plancha alta con los brazos extendidos.", "Lleva una rodilla hacia el pecho y regresa, alternando las piernas rápidamente.", "Mantén la cadera baja y el core contraído durante todo el movimiento."] },
+      ],
+    },
+    {
+      id: "b-emom", type: "emom", name: "Emom 1", minutesTotal: 7, repsInitial: 8, repsIncrement: 2,
+      exercise: { name: "Press con barra", img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+        muscles: ["Hombro frontal", "Tríceps", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+        instructions: ["Sujeta la barra al frente de los hombros con agarre prono.", "Empuja la barra por encima de la cabeza hasta extender los brazos.", "Baja con control y completa las repeticiones antes de que termine el minuto."] },
+    },
+    {
+      id: "b-cardio-trad", type: "cardio", mode: "traditional", name: "Cardio 1", totalTimeSeconds: 60,
+      exercise: { name: "Trote continuo", img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+        muscles: ["Cuádriceps", "Pantorrillas", "Cardiovascular"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+        instructions: ["Mantén un ritmo constante que puedas sostener durante todo el bloque.", "Cuida la postura: espalda recta, mirada al frente, brazos relajados.", "Ajusta la velocidad si necesitas recuperar el aliento sin detenerte por completo."] },
+    },
+    {
+      id: "b-cardio-int", type: "cardio", mode: "interval", name: "Cardio 2 — Intervalos", totalTimeSeconds: 90,
+      intervals: [
+        { name: "Sprint en cinta", workSeconds: 20, restSeconds: 10, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Cuádriceps", "Cardiovascular"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
+          instructions: ["Corre al máximo esfuerzo sostenible durante el tramo de trabajo.", "Mantén el torso erguido y una respiración controlada."] },
+        { name: "Jumping jacks", reps: 20, workSeconds: 20, restSeconds: 10, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Cuerpo completo"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Salta abriendo brazos y piernas a la vez.", "Regresa a la posición inicial con un salto y repite el ritmo."] },
+      ],
+    },
+    { id: "b-rest-2", type: "rest", timeSeconds: 45,
+      img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+      instructions: ["Bebe agua y controla la respiración.", "Estira brevemente los grupos musculares recién trabajados."] },
+    {
+      id: "b-cycle-time", type: "cycle", name: "Bloque 2 — Core por tiempo", series: 3, restBetweenSeconds: 20,
+      exercises: [
+        { name: "Plancha frontal", mode: "time", timeSeconds: 40, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Core", "Abdomen"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Apóyate sobre los antebrazos y la punta de los pies formando una línea recta.", "Contrae abdomen y glúteos durante todo el tiempo indicado."] },
+        { name: "Plancha lateral", mode: "time", timeSeconds: 30, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Oblicuos", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+          instructions: ["Apóyate sobre un antebrazo con el cuerpo alineado.", "Sostén la cadera elevada sin dejarla caer."] },
+      ],
+    },
+    {
+      // Entrenamientos en casa: el backend envía reps 0 y tiempo 0 → el ejercicio se hace AL FALLO.
+      id: "b-cycle-fallo", type: "cycle", name: "Bloque 3 — En casa", series: 3, restBetweenSeconds: 30, home: true,
+      exercises: [
+        { name: "Flexiones", mode: "failure", reps: 0, timeSeconds: 0, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+          muscles: ["Pecho", "Tríceps", "Core"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
+          instructions: ["Haz tantas repeticiones como puedas manteniendo la técnica.", "Termina la serie cuando ya no puedas completar una repetición completa."] },
+        { name: "Sentadilla con peso corporal", mode: "failure", reps: 0, timeSeconds: 0, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+          muscles: ["Cuádriceps", "Glúteos"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/production/programs/62602b4982a4b6bee3ac99ef/HKqqC0QjNI-science%20mini.mp4",
+          instructions: ["Baja controlando hasta que los muslos queden paralelos al piso.", "Repite hasta el fallo muscular, sin perder la postura."] },
+      ],
+    },
   ],
 
   sections: [
@@ -73,6 +144,14 @@ window.FF_DATA = {
         { name: "Press de banca inclinado con mancuernas", desc: { kind: "repeats", reps: 10, rir: 2 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
         { name: "Aperturas con mancuernas en banco plano", desc: { kind: "repeats", reps: 12, rir: 0 }, rest: "60 seg.", img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
         { name: "Plancha frontal", desc: { kind: "time", time: "30", unit: "seg" }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
+      ],
+    },
+    {
+      // En casa: reps 0 y tiempo 0 desde el backend → "Al fallo".
+      type: "cycle", name: "Bloque 2 — En casa", series: 3, restBetweenSeriesSeconds: 45, home: true,
+      exercises: [
+        { name: "Flexiones", desc: { kind: "repeats", reps: 0, timeSeconds: 0 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg" },
+        { name: "Sentadilla con peso corporal", desc: { kind: "repeats", reps: 0, timeSeconds: 0, rir: 0 }, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg" },
       ],
     },
     { type: "rest", timeSeconds: 90 },

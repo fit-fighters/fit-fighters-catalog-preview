@@ -544,6 +544,16 @@ function ExerciseDescriptionView({ desc }) {
   const col = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 };
   const num = { fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.1 };
   const unit = { fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)" };
+  const isFailure = desc.kind === "failure" || (desc.kind === "repeats" && !desc.reps) || (desc.kind === "time" && !parseFloat(desc.time));
+  if (isFailure) {
+    return (
+      <div style={col}>
+        <span style={num}>máx</span>
+        <span style={unit}>reps</span>
+        <RIRBadge rir={0} />
+      </div>
+    );
+  }
   if (desc.kind === "repeats") {
     return (
       <div style={col}>
@@ -1242,17 +1252,10 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
 window.ProfileScreen = ProfileScreen;
 
 // ── Trainer.jsx ─────────────────────────────────────────────────
-// FitFighters mobile — Virtual trainer. Supports all 7 section block types.
-
-const SECTION_CFG = {
-  cycle:    { label: "Repeticiones",    bgTint: "rgba(255,50,0,0.04)",    isTime: false },
-  stripset: { label: "Repeticiones",    bgTint: "rgba(255,154,60,0.04)",  isTime: false },
-  rest:     { label: "Descanso",        bgTint: "rgba(107,122,141,0.06)", isTime: true  },
-  amrap:    { label: "Tiempo restante", bgTint: "rgba(77,166,255,0.04)",  isTime: true  },
-  fortime:  { label: "Tiempo",          bgTint: "rgba(46,207,122,0.04)",  isTime: true  },
-  emom:     { label: "En el minuto",    bgTint: "rgba(199,125,255,0.04)", isTime: true  },
-  cardio:   { label: "Tiempo activo",   bgTint: "rgba(77,166,255,0.04)",  isTime: true  },
-};
+// FitFighters mobile — Virtual trainer. Supports all 7 section block types with real per-type
+// timing behavior: reps-vs-time Cycle, count-up For time, countdown+rounds AMRAP, sequence
+// Stripset, looping EMOM, dual-timer Cardio (traditional/interval), and both Rest variants
+// (standalone section rest vs. inter-exercise overlay).
 
 const PAUSE_TABS = [
   { id: "pausa", label: "Pausa" },
@@ -1260,28 +1263,192 @@ const PAUSE_TABS = [
   { id: "instrucciones", label: "Instrucciones" },
 ];
 
-function groupIntoBlocks(ex) {
-  const blocks = [];
-  ex.forEach((item) => {
-    if (item.type === "rest") {
-      const last = blocks[blocks.length - 1];
-      if (last) last.rest = item;
-      return;
-    }
-    const last = blocks[blocks.length - 1];
-    const sameBlock = last && !last.rest && (item.type === "cycle" || item.type === "stripset") && last.items[0].type === item.type;
-    if (sameBlock) last.items.push(item);
-    else blocks.push({ id: `blk-${blocks.length}`, items: [item], rest: null });
-  });
-  return blocks;
+function fmtClock(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-function blockSubtitle(items) {
-  const first = items[0];
-  if (first.type === "cycle" || first.type === "stripset") return `${items.length > 1 ? items.length + " ejercicios · " : ""}serie ${first.serie}/${first.total}`;
-  if (first.type === "emom") return `${first.time} · minuto ${first.minCurrent || 1}/${first.minTotal || 1}`;
-  if (first.type === "rest") return `Descanso ${first.time}`;
-  return first.time || "";
+// ── Per-block run engine ──────────────────────────────────────────
+// `run` holds the mutable playback state for the CURRENT block. `makeRun` builds it fresh
+// whenever the block changes; `tickRun` advances it by one second; `startStepInRun` /
+// `advanceStep` move the step cursor for manually-advanced types (cycle/stripset).
+
+function startStepInRun(run, stepIdx) {
+  const step = run.steps[stepIdx];
+  return { ...run, stepIdx, phase: "active", timeRemaining: step.mode === "time" ? step.timeSeconds : 0 };
+}
+
+function advanceStep(block, run, nextBlock) {
+  if (run.stepIdx >= run.steps.length - 1) { nextBlock(); return run; }
+  if (block.restBetweenSeconds) return { ...run, phase: "rest", restRemaining: block.restBetweenSeconds };
+  return startStepInRun(run, run.stepIdx + 1);
+}
+
+function makeRun(block) {
+  if (block.type === "rest") return { remaining: block.timeSeconds };
+  if (block.type === "cycle") {
+    const steps = [];
+    for (let s = 1; s <= block.series; s++) {
+      block.exercises.forEach((e, exIdx) => steps.push({ exIdx, serie: s, mode: e.mode, reps: e.reps, timeSeconds: e.timeSeconds }));
+    }
+    return startStepInRun({ steps }, 0);
+  }
+  if (block.type === "stripset") {
+    const seqLen = block.exercises[0].sequence.length;
+    const steps = [];
+    for (let i = 0; i < seqLen; i++) {
+      block.exercises.forEach((e, exIdx) => steps.push({ exIdx, serie: i + 1, mode: "reps", reps: e.sequence[i] }));
+    }
+    return startStepInRun({ steps }, 0);
+  }
+  if (block.type === "fortime") {
+    const steps = [];
+    for (let r = 1; r <= block.rounds; r++) {
+      block.exercises.forEach((e, exIdx) => steps.push({ exIdx, round: r }));
+    }
+    return { steps, stepIdx: 0, phase: "active", elapsed: 0 };
+  }
+  if (block.type === "amrap") return { phase: "active", remaining: block.totalTimeSeconds, stepIdx: 0, roundsCompleted: 0 };
+  if (block.type === "emom") return { phase: "active", minuteIdx: 1, secondsLeft: 60 };
+  if (block.type === "cardio") {
+    if (block.mode === "traditional") return { phase: "active", blockRemaining: block.totalTimeSeconds };
+    return { phase: "interval-work", blockRemaining: block.totalTimeSeconds, intervalIdx: 0, phaseRemaining: block.intervals[0].workSeconds };
+  }
+  return {};
+}
+
+function tickRun(block, run, nextBlock) {
+  if (!run) return run;
+  if (block.type === "rest") {
+    const remaining = run.remaining - 1;
+    if (remaining <= 0) { nextBlock(); return run; }
+    return { ...run, remaining };
+  }
+  if (run.phase === "rest") {
+    const restRemaining = run.restRemaining - 1;
+    if (restRemaining <= 0) return startStepInRun(run, run.stepIdx + 1);
+    return { ...run, restRemaining };
+  }
+  switch (block.type) {
+    case "cycle":
+    case "stripset": {
+      const step = run.steps[run.stepIdx];
+      if (step.mode === "time") {
+        const timeRemaining = run.timeRemaining - 1;
+        if (timeRemaining <= 0) return advanceStep(block, run, nextBlock);
+        return { ...run, timeRemaining };
+      }
+      return run;
+    }
+    case "fortime":
+      return { ...run, elapsed: run.elapsed + 1 };
+    case "amrap": {
+      const remaining = run.remaining - 1;
+      if (remaining <= 0) { nextBlock(); return run; }
+      return { ...run, remaining };
+    }
+    case "emom": {
+      const secondsLeft = run.secondsLeft - 1;
+      if (secondsLeft <= 0) return { ...run, minuteIdx: run.minuteIdx + 1, secondsLeft: 60 };
+      return { ...run, secondsLeft };
+    }
+    case "cardio": {
+      const blockRemaining = run.blockRemaining - 1;
+      if (blockRemaining <= 0) { nextBlock(); return run; }
+      if (block.mode === "traditional") return { ...run, blockRemaining };
+      const phaseRemaining = run.phaseRemaining - 1;
+      if (phaseRemaining <= 0) {
+        if (run.phase === "interval-work") {
+          const restSecs = block.intervals[run.intervalIdx].restSeconds || 0;
+          if (restSecs > 0) return { ...run, blockRemaining, phase: "interval-rest", phaseRemaining: restSecs };
+        }
+        const nextIdx = (run.intervalIdx + 1) % block.intervals.length;
+        return { ...run, blockRemaining, intervalIdx: nextIdx, phase: "interval-work", phaseRemaining: block.intervals[nextIdx].workSeconds };
+      }
+      return { ...run, blockRemaining, phaseRemaining };
+    }
+    default:
+      return run;
+  }
+}
+
+function currentExerciseInfo(block, run) {
+  if (block.type === "rest") return { name: "Descanso", img: block.img, instructions: block.instructions, videoUrl: null };
+  if (block.type === "cycle" || block.type === "stripset" || block.type === "fortime") return block.exercises[run.steps[run.stepIdx].exIdx];
+  if (block.type === "amrap") return block.exercises[run.stepIdx % block.exercises.length];
+  if (block.type === "emom") return block.exercise;
+  if (block.type === "cardio") return block.mode === "traditional" ? block.exercise : block.intervals[run.intervalIdx];
+  return {};
+}
+
+function getDisplay(block, run) {
+  const type = block.type;
+  if (type === "cycle") {
+    const step = run.steps[run.stepIdx];
+    const panel = [{ v: step.serie, l: "Serie" }, { v: block.series, l: "Total" }];
+    if (step.mode === "time") return { big: fmtCountdown(run.timeRemaining), label: "Tiempo", panel };
+    if (step.mode === "failure" || !step.reps) return { big: "Al fallo", bigSize: 38, label: "Hasta no poder más", panel };
+    return { big: step.reps, label: "Repeticiones", panel };
+  }
+  if (type === "stripset") {
+    const step = run.steps[run.stepIdx];
+    const ex = block.exercises[step.exIdx];
+    return { big: step.reps, label: "Repeticiones", panel: [{ v: step.serie, l: "Serie" }, { v: ex.sequence.length, l: "Total" }] };
+  }
+  if (type === "fortime") {
+    const step = run.steps[run.stepIdx];
+    const ex = block.exercises[step.exIdx];
+    return {
+      big: ex.reps, label: "Repeticiones",
+      timer: { v: fmtCountdown(run.elapsed), l: "Tiempo" },
+      panel: [{ v: step.round, l: "Ronda" }, { v: block.rounds, l: "Total" }],
+    };
+  }
+  if (type === "amrap") {
+    const ex = block.exercises[run.stepIdx % block.exercises.length];
+    const isTime = !ex.reps;
+    return {
+      big: isTime ? fmtCountdown(ex.timeSeconds) : ex.reps, label: isTime ? "Tiempo" : "Repeticiones",
+      timer: { v: fmtCountdown(run.remaining), l: "Restante" },
+      panel: [{ v: run.roundsCompleted, l: "Rondas" }, { v: `${(run.stepIdx % block.exercises.length) + 1}/${block.exercises.length}`, l: "Ejercicio" }],
+    };
+  }
+  if (type === "emom") {
+    const reps = block.repsInitial + block.repsIncrement * (run.minuteIdx - 1);
+    return {
+      big: fmtCountdown(run.secondsLeft), label: "Tiempo",
+      panel: [{ v: reps, l: "Repeticiones" }, { v: run.minuteIdx - 1, l: "Min. completados" }],
+    };
+  }
+  if (type === "cardio") {
+    if (block.mode === "traditional") return { big: fmtCountdown(run.blockRemaining), label: "Tiempo restante" };
+    const iv = block.intervals[run.intervalIdx];
+    const isRestPhase = run.phase === "interval-rest";
+    if (isRestPhase) return { big: fmtCountdown(run.phaseRemaining), label: "Descanso", timer: { v: fmtCountdown(run.blockRemaining), l: "Bloque" }, isRestPhase: true };
+    if (iv.reps) return { big: iv.reps, label: "Repeticiones", timer: { v: fmtCountdown(run.blockRemaining), l: "Bloque" } };
+    return { big: fmtCountdown(run.phaseRemaining), label: "Tiempo", timer: { v: fmtCountdown(run.blockRemaining), l: "Bloque" } };
+  }
+  return {};
+}
+
+function blockPrimary(block) {
+  if (block.type === "rest") return { name: "Descanso entre secciones", img: block.img, meta: `${fmtCountdown(block.timeSeconds)}` };
+  if (block.type === "emom") return { name: block.exercise.name, img: block.exercise.img, meta: `EMOM · ${block.minutesTotal} min` };
+  if (block.type === "cardio" && block.mode === "traditional") return { name: block.exercise.name, img: block.exercise.img, meta: `Cardio · ${fmtCountdown(block.totalTimeSeconds)}` };
+  if (block.type === "cardio") return { name: block.name, img: block.intervals[0].img, meta: `Cardio intervalos · ${fmtCountdown(block.totalTimeSeconds)}` };
+  if (block.type === "amrap") return { name: block.name, img: block.exercises[0].img, meta: `AMRAP · ${fmtCountdown(block.totalTimeSeconds)}` };
+  if (block.type === "fortime") return { name: block.name, img: block.exercises[0].img, meta: `${block.rounds} rondas · for time` };
+  if (block.type === "stripset") return { name: block.exercises[0].name, img: block.exercises[0].img, meta: `${block.exercises[0].sequence.length} series · stripset` };
+  return { name: block.exercises[0].name, img: block.exercises[0].img, meta: `${block.exercises.length > 1 ? block.exercises.length + " ejercicios · " : ""}${block.series} series` };
+}
+
+function blockExpandList(block) {
+  if (block.type === "cardio" && block.mode === "interval") return block.intervals.map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo / ${iv.restSeconds}s desc.` }));
+  if (block.exercises) return block.exercises.map((e) => ({ name: e.name, img: e.img, meta: e.reps ? `${e.reps} reps` : e.sequence ? e.sequence.join("-") : e.timeSeconds ? fmtCountdown(e.timeSeconds) : "Al fallo" }));
+  return [];
 }
 
 function TrainerTabBar({ active, onChange, color }) {
@@ -1303,39 +1470,35 @@ function TrainerThumb({ img, size }) {
 }
 
 function TrainerQueueRow({ block, isExpanded, onToggleExpand, onPostpone, onDragStart, onDragOver, onDrop }) {
-  const first = block.items[0];
+  const primary = blockPrimary(block);
+  const expandList = blockExpandList(block);
+  const canExpand = expandList.length > 1;
   return (
     <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0" }}>
         <span style={{ cursor: "grab", color: "rgba(255,255,255,.35)", display: "flex", flexShrink: 0 }} title="Arrastra para reordenar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
         </span>
-        <div onClick={onToggleExpand} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-          <SectionBadge type={first.type} showLabel={false} />
+        <div onClick={canExpand ? onToggleExpand : undefined} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, cursor: canExpand ? "pointer" : "default" }}>
+          <SectionBadge type={block.type} showLabel={false} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3 }}>{first.name}</p>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: ".03em" }}>{blockSubtitle(block.items)}</p>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3 }}>{primary.name}</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: ".03em" }}>{primary.meta}</p>
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2" style={{ flexShrink: 0, transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>
+          {canExpand && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2" style={{ flexShrink: 0, transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>}
         </div>
         <button onClick={onPostpone} title="Posponer para el final de la cola" style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.65)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></svg>
         </button>
       </div>
-      {block.rest && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 0 10px 26px" }}>
-          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.3)", flexShrink: 0 }} />
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)" }}>Descanso · {block.rest.time}</span>
-        </div>
-      )}
-      {isExpanded && (
+      {isExpanded && canExpand && (
         <div style={{ padding: "0 0 12px 26px", display: "flex", flexDirection: "column", gap: 10 }}>
-          {block.items.map((it, i) => (
+          {expandList.map((it, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <TrainerThumb img={it.img} size={26} />
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.7)", flex: 1, minWidth: 0, lineHeight: 1.4 }}>{it.name}</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)", flexShrink: 0 }}>{it.type === "rest" ? it.time : it.reps ? `${it.reps} reps` : it.time}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)", flexShrink: 0 }}>{it.meta}</span>
             </div>
           ))}
         </div>
@@ -1450,147 +1613,304 @@ function TrainerCtrlBtn({ children, label, primary, danger, color, onClick }) {
   );
 }
 
-function TrainerScreen({ onExit, onFinish, initialIndex = 0, initialPaused = false, initialPauseTab = "pausa" }) {
-  const ex = window.FF_DATA.exercises;
-  const [idx, setIdx] = React.useState(initialIndex);
+function ConfirmDialog({ title, message, cancelLabel, confirmLabel, danger, onCancel, onConfirm }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 70, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 300, background: "#161616", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", margin: 0 }}>{title}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.6)", margin: 0, lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: 12, borderRadius: 10, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>{cancelLabel}</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: 12, borderRadius: 10, background: danger ? "rgba(255,50,0,0.15)" : "var(--ff-primary,#FF3200)", border: danger ? "1px solid rgba(255,50,0,0.35)" : "none", color: danger ? "var(--ff-error,#FF5C5C)" : "#fff", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CountdownModal({ n, color, exerciseName }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 260, background: "#161616", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "26px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.5)" }}>Prepárate</span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 76, color, lineHeight: 1.1 }}>{n}</span>
+        {exerciseName && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.55)", textAlign: "center" }}>{exerciseName}</span>}
+      </div>
+    </div>
+  );
+}
+
+function InterRestOverlay({ seconds, nextName, onSkip }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, background: "rgba(10,10,10,0.86)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: 24, textAlign: "center" }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ff-section-rest, #6B7A8D)" }}>Descanso entre ejercicios</span>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 56, color: "#fff", lineHeight: 1 }}>{fmtCountdown(seconds)}</span>
+      {nextName && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.5)", maxWidth: 220 }}>Sigue: {nextName}</span>}
+      <button onClick={onSkip} style={{ marginTop: 6, padding: "8px 18px", borderRadius: 999, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 12, cursor: "pointer" }}>Saltar descanso</button>
+    </div>
+  );
+}
+
+function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused = false, initialPauseTab = "pausa", lockBlock = false, demoInterRest = false, holdPreroll = false }) {
+  const blocks = window.FF_DATA.trainerBlocks;
+  const [blockIdx, setBlockIdx] = React.useState(initialBlockIndex);
   const [paused, setPaused] = React.useState(initialPaused);
-  const [elapsed, setElapsed] = React.useState(0);
   const [pauseTab, setPauseTab] = React.useState(initialPauseTab);
-  const [queue, setQueue] = React.useState(() => groupIntoBlocks(ex));
+  const [sessionElapsed, setSessionElapsed] = React.useState(0);
+  const [run, setRun] = React.useState(() => {
+    const r = makeRun(blocks[initialBlockIndex]);
+    return demoInterRest ? { ...r, phase: "rest", restRemaining: blocks[initialBlockIndex].restBetweenSeconds } : r;
+  });
+  const [queue, setQueue] = React.useState(() => blocks.slice(initialBlockIndex + 1));
   const [expandedBlockId, setExpandedBlockId] = React.useState(null);
   const [showVideo, setShowVideo] = React.useState(false);
+  const [confirmExit, setConfirmExit] = React.useState(false);
+  const [confirmStop, setConfirmStop] = React.useState(false);
+  const [preroll, setPreroll] = React.useState(blocks[initialBlockIndex].type === "rest" || demoInterRest ? null : 3);
+  const transitionLock = React.useRef(false);
 
-  const postponeBlock = (id) => setQueue(q => { const b = q.find(x => x.id === id); return b ? [...q.filter(x => x.id !== id), b] : q; });
-  const reorderQueue = (from, to) => setQueue(q => { if (from === to) return q; const copy = q.slice(); const [moved] = copy.splice(from, 1); copy.splice(to, 0, moved); return copy; });
+  const block = blocks[blockIdx];
+
+  const goToBlock = (i) => {
+    if (lockBlock) { setRun(makeRun(blocks[blockIdx])); setPreroll(blocks[blockIdx].type === "rest" ? null : 3); return; }
+    if (transitionLock.current) return;
+    transitionLock.current = true;
+    if (i >= blocks.length) { onFinish(); return; }
+    setBlockIdx(i);
+  };
+  const nextBlock = () => goToBlock(blockIdx + 1);
 
   React.useEffect(() => {
+    setRun(makeRun(block));
+    setPreroll(block.type === "rest" ? null : 3);
+    setQueue(blocks.slice(blockIdx + 1));
+    transitionLock.current = false;
+  }, [blockIdx]);
+
+  // Global session clock — runs start to finish; only a user pause stops it.
+  React.useEffect(() => {
     if (paused) return;
-    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    const t = setInterval(() => setSessionElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [paused]);
 
-  const fmtElapsed = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    const pad = n => String(n).padStart(2, "0");
-    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  // Per-block engine heartbeat — drives every timer/loop/auto-cut described per section type.
+  React.useEffect(() => {
+    if (paused || preroll === null || holdPreroll) return;
+    const t = setInterval(() => setPreroll((n) => (n > 1 ? n - 1 : null)), 1000);
+    return () => clearInterval(t);
+  }, [paused, preroll === null]);
+
+  React.useEffect(() => {
+    if (paused || preroll !== null) return;
+    const t = setInterval(() => setRun((prev) => {
+      const next = tickRun(block, prev, nextBlock);
+      if (demoInterRest && next.phase !== "rest") return { ...makeRun(block), phase: "rest", restRemaining: block.restBetweenSeconds };
+      return next;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [paused, blockIdx, preroll === null]);
+
+  const postponeBlock = (id) => setQueue((q) => { const b = q.find((x) => x.id === id); return b ? [...q.filter((x) => x.id !== id), b] : q; });
+  const reorderQueue = (from, to) => setQueue((q) => { if (from === to) return q; const copy = q.slice(); const [moved] = copy.splice(from, 1); copy.splice(to, 0, moved); return copy; });
+
+  const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
+  const isSectionRest = block.type === "rest";
+  const isInterRest = run.phase === "rest";
+  const isResting = isSectionRest || isInterRest || run.phase === "interval-rest";
+
+  const curInfo = currentExerciseInfo(block, run);
+
+  const onSiguiente = () => {
+    if (block.type === "cycle" || block.type === "stripset") setRun((r) => advanceStep(block, r, nextBlock));
+    else if (block.type === "fortime") setRun((r) => { if (r.stepIdx >= r.steps.length - 1) { nextBlock(); return r; } return { ...r, stepIdx: r.stepIdx + 1 }; });
+    else if (block.type === "amrap") setRun((r) => { const ni = r.stepIdx + 1; const wrapped = ni % block.exercises.length === 0; return { ...r, stepIdx: ni, roundsCompleted: wrapped ? r.roundsCompleted + 1 : r.roundsCompleted }; });
+    else if (isSectionRest) nextBlock();
+    else nextBlock();
   };
+  const onAnterior = () => {
+    if (block.type === "cycle" || block.type === "stripset") setRun((r) => (r.stepIdx > 0 ? startStepInRun(r, r.stepIdx - 1) : r));
+    else if (block.type === "fortime") setRun((r) => (r.stepIdx > 0 ? { ...r, stepIdx: r.stepIdx - 1 } : r));
+  };
+  const anteriorEnabled = (block.type === "cycle" || block.type === "stripset") ? run.stepIdx > 0 : (block.type === "fortime" ? run.stepIdx > 0 : false);
+  const siguienteLabel = (block.type === "cycle" || block.type === "stripset" || block.type === "fortime") ? "Siguiente" : (block.type === "amrap" ? "Ronda" : (isSectionRest ? "Saltar" : "Sección"));
 
-  const cur = ex[idx];
-  const type = cur.type || "cycle";
-  const cfg = SECTION_CFG[type] || SECTION_CFG.cycle;
-  const color = (SECTION_TYPES[type] || SECTION_TYPES["cycle"]).color;
-  const displayValue = cfg.isTime ? (cur.time || "00:00") : cur.reps;
-  const isRest = type === "rest";
+  const prerollShown = holdPreroll ? 3 : preroll;
+  const nextBlockPrimary = blockIdx + 1 < blocks.length ? blockPrimary(blocks[blockIdx + 1]) : null;
+  const display = !isSectionRest ? getDisplay(block, run) : null;
+  const numberColor = display && display.isRestPhase ? "var(--ff-section-rest, #6B7A8D)" : color;
 
-  const next = () => idx < ex.length - 1 ? setIdx(idx + 1) : onFinish();
-  const prev = () => setIdx(Math.max(0, idx - 1));
-
-  // Info panel varies by block type
-  let infoPanel = null;
-  {
-    if (type === "cycle" || type === "stripset") {
-      infoPanel = (
-        <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 6 }}>
-          <TrainerPanelItem value={cur.serie} label="Serie" />
-          <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />
-          <TrainerPanelItem value={cur.total} label="Total" />
-        </div>
-      );
-    } else if (type === "emom") {
-      infoPanel = (
-        <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 6 }}>
-          <TrainerPanelItem value={cur.minCurrent || 3} label="Minuto" />
-          <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />
-          <TrainerPanelItem value={cur.minTotal || 7} label="Total" />
-        </div>
-      );
-    } else if (type === "rest" && idx + 1 < ex.length) {
-      infoPanel = (
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.4)", textAlign: "center", margin: "8px 0 0" }}>
-          Próximo: {ex[idx + 1].name}
-        </p>
-      );
-    }
-  }
+  const askExit = () => setConfirmExit(true);
+  const askStop = () => setConfirmStop(true);
 
   return (
     <div style={{ position: "relative", height: "100%", background: "#0a0a0a", display: "flex", flexDirection: "column", overflow: "hidden" }} data-screen-label="Entrenador">
       {/* Video */}
       <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", background: "#111", overflow: "hidden", flexShrink: 0 }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${cur.img})`, backgroundSize: "cover", backgroundPosition: "center", filter: (isRest || paused) ? "saturate(.35) brightness(.55)" : "none", transition: "filter .3s" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${curInfo.img})`, backgroundSize: "cover", backgroundPosition: "center", filter: (isResting || paused) ? "saturate(.35) brightness(.55)" : "none", transition: "filter .3s" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, transparent 35%, transparent 60%, rgba(0,0,0,.6) 100%)" }} />
-        <button onClick={onExit} style={{ position: "absolute", top: 10, left: 6, width: 44, height: 44, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button onClick={askExit} style={{ position: "absolute", top: 10, left: 6, width: 44, height: 44, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
+        {/* Global session clock — never resets, keeps running through rests and section changes */}
+        <div style={{ position: "absolute", top: 14, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.5)", borderRadius: 999, padding: "4px 10px" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" strokeWidth="2"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.85)" }}>{fmtClock(sessionElapsed)}</span>
+        </div>
         {/* Block type badge */}
         <div style={{ position: "absolute", top: 14, right: 14, background: `color-mix(in srgb, ${color} 15%, transparent)`, borderRadius: 999, padding: "3px 9px", border: `1px solid color-mix(in srgb, ${color} 30%, transparent)` }}>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color }}>{type}</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color }}>{(SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label}</span>
         </div>
         {paused && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.85)" }}>En pausa</span>
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 22, color: "#fff", marginTop: 8 }}>{fmtElapsed(elapsed)}</span>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "20px 20px", gap: 16, background: cfg.bgTint, minHeight: 0 }}>
-        {!paused && (
-          <>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
+      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", padding: "20px 20px", gap: 16, minHeight: 0 }}>
+        {!paused && isInterRest && <InterRestOverlay seconds={run.restRemaining} nextName={block.exercises[run.steps[run.stepIdx + 1].exIdx].name} onSkip={() => setRun((r) => startStepInRun(r, r.stepIdx + 1))} />}
+
+        {!paused && isSectionRest && (
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", textAlign: "center", margin: 0 }}>Descanso entre secciones</p>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
-              <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
-              {infoPanel}
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.remaining)}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Tiempo restante</span>
+              {nextBlockPrimary && <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.45)", textAlign: "center", margin: "12px 0 0" }}>Próximo: {nextBlockPrimary.name}</p>}
+              <button onClick={nextBlock} style={{ marginTop: 14, padding: "8px 18px", borderRadius: 999, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 12, cursor: "pointer" }}>Saltar descanso</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 40 }}>
+              <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => { setPaused(true); setPauseTab("pausa"); }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+              </TrainerCtrlBtn>
+              <TrainerCtrlBtn label="Saltar" color={color} onClick={nextBlock}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
+              </TrainerCtrlBtn>
+            </div>
+          </div>
+        )}
+
+        {!paused && !isSectionRest && !isInterRest && (
+          <>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{curInfo.name}</p>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
+              {display.timer && (
+                <div style={{ display: "flex", alignItems: "baseline", gap: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "5px 14px", marginBottom: 10 }}>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", lineHeight: 1 }}>{display.timer.v}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>{display.timer.l}</span>
+                </div>
+              )}
+              <span style={{ fontFamily: "var(--font-display)", fontSize: display.bigSize || 60, color: numberColor, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${numberColor} 35%, transparent)` }}>{display.big}</span>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{display.label}</span>
+              {display.sub && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.45)", marginTop: 2 }}>{display.sub}</span>}
+              {display.panel && (
+                <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 10 }}>
+                  {display.panel.map((p, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />}
+                      <TrainerPanelItem value={p.v} label={p.l} />
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
 
-        {!paused ? (
+        {!paused && !isSectionRest && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <TrainerCtrlBtn label="Anterior" color={color} onClick={prev}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>
+            <TrainerCtrlBtn label="Anterior" color={color} onClick={onAnterior}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={anteriorEnabled ? "#fff" : "rgba(255,255,255,.25)"} strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>
             </TrainerCtrlBtn>
             <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => { setPaused(true); setPauseTab("pausa"); }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             </TrainerCtrlBtn>
-            <TrainerCtrlBtn label="Siguiente" color={color} onClick={next}>
+            <TrainerCtrlBtn label={siguienteLabel} color={color} onClick={onSiguiente}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
             </TrainerCtrlBtn>
             <TrainerCtrlBtn label="Sonido" color={color}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>
             </TrainerCtrlBtn>
           </div>
-        ) : (
+        )}
+
+        {paused && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
             <TrainerTabBar active={pauseTab} onChange={setPauseTab} color={color} />
             <div style={{ flex: 1, overflowY: "auto", padding: "14px 0 4px" }}>
               {pauseTab === "pausa" && (
                 <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: 360 }}>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{cur.name}</p>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{curInfo.name}</p>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                    <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${color} 35%, transparent)` }}>{displayValue}</span>
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{cfg.label}</span>
-                    {infoPanel}
+                    {isSectionRest ? (
+                      <>
+                        <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.remaining)}</span>
+                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Descanso</span>
+                      </>
+                    ) : isInterRest ? (
+                      <>
+                        <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.restRemaining)}</span>
+                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Descanso entre ejercicios</span>
+                      </>
+                    ) : (
+                      <>
+                        {display.timer && (
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "5px 14px", marginBottom: 8 }}>
+                            <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", lineHeight: 1 }}>{display.timer.v}</span>
+                            <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>{display.timer.l}</span>
+                          </div>
+                        )}
+                        <span style={{ fontFamily: "var(--font-display)", fontSize: display.bigSize || 60, color: numberColor, lineHeight: 1 }}>{display.big}</span>
+                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{display.label}</span>
+                        {display.panel && (
+                          <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 10 }}>
+                            {display.panel.map((p, i) => (
+                              <React.Fragment key={i}>
+                                {i > 0 && <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />}
+                                <TrainerPanelItem value={p.v} label={p.l} />
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <Button variant="primary" onClick={() => setPaused(false)}>Reanudar</Button>
-                    <button onClick={onFinish} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Detener</button>
+                    <Button variant="primary" onClick={() => { setPaused(false); if (block.type !== "rest") setPreroll(3); }}>Reanudar</Button>
+                    <button onClick={askStop} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Finalizar entrenamiento</button>
                   </div>
                 </div>
               )}
               {pauseTab === "cola" && (
                 <TrainerQueueTab queue={queue} expandedId={expandedBlockId} onToggleExpand={setExpandedBlockId} onPostpone={postponeBlock} onReorder={reorderQueue} />
               )}
-              {pauseTab === "instrucciones" && <TrainerInstructionsTab exercise={cur} onWatchVideo={() => setShowVideo(true)} />}
+              {pauseTab === "instrucciones" && <TrainerInstructionsTab exercise={curInfo} onWatchVideo={() => setShowVideo(true)} />}
             </div>
           </div>
         )}
       </div>
-      {showVideo && <TrainerVideoScreen exercise={cur} onClose={() => setShowVideo(false)} />}
+      {!paused && prerollShown !== null && <CountdownModal n={prerollShown} color={color} exerciseName={curInfo.name} />}
+      {showVideo && <TrainerVideoScreen exercise={curInfo} onClose={() => setShowVideo(false)} />}
+      {confirmExit && (
+        <ConfirmDialog
+          title="¿Salir del entrenador?"
+          message="Perderás el progreso de esta sesión si sales ahora."
+          cancelLabel="Cancelar" confirmLabel="Salir" danger
+          onCancel={() => setConfirmExit(false)}
+          onConfirm={onExit}
+        />
+      )}
+      {confirmStop && (
+        <ConfirmDialog
+          title="¿Finalizar entrenamiento?"
+          message="Verás el resumen con tu progreso hasta este punto."
+          cancelLabel="Seguir entrenando" confirmLabel="Finalizar" danger
+          onCancel={() => setConfirmStop(false)}
+          onConfirm={onFinish}
+        />
+      )}
     </div>
   );
 }
@@ -2482,6 +2802,7 @@ function Catalog() {
       cells: [
         { label: "Detalle de rutina", note: "Hoy", el: <WorkoutDetailScreen item={today} onBack={noop} onStart={noop} /> },
         { label: "Detalle de rutina", note: "Día completado", el: <WorkoutDetailScreen item={done} onBack={noop} onStart={noop} /> },
+        { label: "Detalle de rutina", note: "casa · reps 0 y tiempo 0 → Al fallo", el: <WorkoutDetailScreen item={today} blocksOverride={[window.FF_DATA.routineDetailBlocks[1]]} onBack={noop} onStart={noop} /> },
       ],
     },
     {
@@ -2495,16 +2816,21 @@ function Catalog() {
     {
       title: "Entrenador virtual",
       cells: [
-        { label: "Cycle", el: <TrainerScreen initialIndex={0} onExit={noop} onFinish={noop} /> },
-        { label: "Stripset", el: <TrainerScreen initialIndex={6} onExit={noop} onFinish={noop} /> },
-        { label: "For time", el: <TrainerScreen initialIndex={3} onExit={noop} onFinish={noop} /> },
-        { label: "AMRAP", el: <TrainerScreen initialIndex={4} onExit={noop} onFinish={noop} /> },
-        { label: "EMOM", el: <TrainerScreen initialIndex={5} onExit={noop} onFinish={noop} /> },
-        { label: "Cardio", el: <TrainerScreen initialIndex={7} onExit={noop} onFinish={noop} /> },
-        { label: "Descanso", el: <TrainerScreen initialIndex={2} onExit={noop} onFinish={noop} /> },
-        { label: "En pausa", el: <TrainerScreen initialIndex={0} initialPaused={true} onExit={noop} onFinish={noop} /> },
-        { label: "Cola", el: <TrainerScreen initialIndex={0} initialPaused={true} initialPauseTab="cola" onExit={noop} onFinish={noop} /> },
-        { label: "Instrucciones", el: <TrainerScreen initialIndex={0} initialPaused={true} initialPauseTab="instrucciones" onExit={noop} onFinish={noop} /> },
+        { label: "Cycle", el: <TrainerScreen initialBlockIndex={0} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cycle por tiempo", el: <TrainerScreen initialBlockIndex={9} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cycle al fallo", note: "casa · backend envía reps 0 y tiempo 0", el: <TrainerScreen initialBlockIndex={10} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Stripset", el: <TrainerScreen initialBlockIndex={2} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "For time", el: <TrainerScreen initialBlockIndex={3} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "AMRAP", el: <TrainerScreen initialBlockIndex={4} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "EMOM", el: <TrainerScreen initialBlockIndex={5} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cardio tradicional", el: <TrainerScreen initialBlockIndex={6} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cardio intervalos", el: <TrainerScreen initialBlockIndex={7} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Descanso entre secciones", el: <TrainerScreen initialBlockIndex={1} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Descanso entre ejercicios", note: "overlay dentro de Cycle/Stripset/Cardio", el: <TrainerScreen initialBlockIndex={0} lockBlock demoInterRest onExit={noop} onFinish={noop} /> },
+        { label: "Prepárate", note: "modal 3-2-1 al iniciar sección o al reanudar", el: <TrainerScreen initialBlockIndex={0} lockBlock holdPreroll onExit={noop} onFinish={noop} /> },
+        { label: "En pausa", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cola", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} initialPauseTab="cola" lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Instrucciones", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} initialPauseTab="instrucciones" lockBlock onExit={noop} onFinish={noop} /> },
       ],
     },
     {
