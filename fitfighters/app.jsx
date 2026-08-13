@@ -1445,6 +1445,14 @@ function blockPrimary(block) {
   return { name: block.exercises[0].name, img: block.exercises[0].img, meta: `${block.exercises.length > 1 ? block.exercises.length + " ejercicios · " : ""}${block.series} series` };
 }
 
+// Título en la cola: nombre del primer ejercicio + "+ N más".
+function queueTitle(block) {
+  const list = block.exercises || block.intervals || (block.exercise ? [block.exercise] : []);
+  if (!list.length) return blockPrimary(block).name;
+  const extra = list.length - 1;
+  return extra > 0 ? `${list[0].name} + ${extra} más` : list[0].name;
+}
+
 function blockExpandList(block) {
   if (block.type === "cardio" && block.mode === "interval") return block.intervals.map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo / ${iv.restSeconds}s desc.` }));
   if (block.exercises) return block.exercises.map((e) => ({ name: e.name, img: e.img, meta: e.reps ? `${e.reps} reps` : e.sequence ? e.sequence.join("-") : e.timeSeconds ? fmtCountdown(e.timeSeconds) : "Al fallo" }));
@@ -1469,7 +1477,16 @@ function TrainerThumb({ img, size }) {
   );
 }
 
-function TrainerQueueRow({ block, isExpanded, onToggleExpand, onPostpone, onDragStart, onDragOver, onDrop }) {
+function QueueRestLine({ rest }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 0 12px 26px" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ff-section-rest, #6B7A8D)" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></svg>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", lineHeight: 1.4 }}>Descanso · {fmtCountdown(rest.timeSeconds)} — viaja con este bloque</span>
+    </div>
+  );
+}
+
+function TrainerQueueRow({ block, rest, isExpanded, onToggleExpand, onPostpone, onDragStart, onDragOver, onDrop }) {
   const primary = blockPrimary(block);
   const expandList = blockExpandList(block);
   const canExpand = expandList.length > 1;
@@ -1482,7 +1499,7 @@ function TrainerQueueRow({ block, isExpanded, onToggleExpand, onPostpone, onDrag
         <div onClick={canExpand ? onToggleExpand : undefined} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, cursor: canExpand ? "pointer" : "default" }}>
           <SectionBadge type={block.type} showLabel={false} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3 }}>{primary.name}</p>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3, overflowWrap: "anywhere", textWrap: "pretty" }}>{queueTitle(block)}</p>
             <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: ".03em" }}>{primary.meta}</p>
           </div>
           {canExpand && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2" style={{ flexShrink: 0, transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform .2s" }}><polyline points="6 9 12 15 18 9" /></svg>}
@@ -1503,6 +1520,7 @@ function TrainerQueueRow({ block, isExpanded, onToggleExpand, onPostpone, onDrag
           ))}
         </div>
       )}
+      {rest && <QueueRestLine rest={rest} />}
     </div>
   );
 }
@@ -1520,18 +1538,42 @@ function TrainerQueueTab({ queue, expandedId, onToggleExpand, onPostpone, onReor
       </div>
     );
   }
+  // El descanso no es un elemento independiente: queda pegado al bloque que lo precede
+  // y se mueve con él al reordenar. Un descanso al inicio de la cola pertenece al bloque en curso.
+  const groups = [];
+  let leadingRest = null;
+  queue.forEach((b) => {
+    if (b.type === "rest") {
+      if (groups.length) groups[groups.length - 1].rest = b;
+      else leadingRest = b;
+      return;
+    }
+    groups.push({ block: b, rest: null });
+  });
+  const flatten = (gs) => [...(leadingRest ? [leadingRest.id] : []), ...gs.flatMap((g) => (g.rest ? [g.block.id, g.rest.id] : [g.block.id]))];
+  const dropAt = (to) => {
+    const from = dragIndex.current;
+    dragIndex.current = null;
+    if (from === null || from === to) return;
+    const gs = groups.slice();
+    const [moved] = gs.splice(from, 1);
+    gs.splice(to, 0, moved);
+    onReorder(flatten(gs));
+  };
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-      {queue.map((block, i) => (
+      {leadingRest && <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", paddingTop: 12 }}><QueueRestLine rest={leadingRest} /></div>}
+      {groups.map((g, i) => (
         <TrainerQueueRow
-          key={block.id}
-          block={block}
-          isExpanded={expandedId === block.id}
-          onToggleExpand={() => onToggleExpand(expandedId === block.id ? null : block.id)}
-          onPostpone={() => onPostpone(block.id)}
+          key={g.block.id}
+          block={g.block}
+          rest={g.rest}
+          isExpanded={expandedId === g.block.id}
+          onToggleExpand={() => onToggleExpand(expandedId === g.block.id ? null : g.block.id)}
+          onPostpone={() => onPostpone(g.block.id)}
           onDragStart={() => { dragIndex.current = i; }}
           onDragOver={(e) => e.preventDefault()}
-          onDrop={() => { if (dragIndex.current !== null) onReorder(dragIndex.current, i); dragIndex.current = null; }}
+          onDrop={() => dropAt(i)}
         />
       ))}
     </div>
@@ -1711,8 +1753,16 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
     return () => clearInterval(t);
   }, [paused, blockIdx, preroll === null]);
 
-  const postponeBlock = (id) => setQueue((q) => { const b = q.find((x) => x.id === id); return b ? [...q.filter((x) => x.id !== id), b] : q; });
-  const reorderQueue = (from, to) => setQueue((q) => { if (from === to) return q; const copy = q.slice(); const [moved] = copy.splice(from, 1); copy.splice(to, 0, moved); return copy; });
+  // Posponer mueve el bloque al final junto con su descanso.
+  const postponeBlock = (id) => setQueue((q) => {
+    const i = q.findIndex((x) => x.id === id);
+    if (i < 0) return q;
+    const take = q[i + 1] && q[i + 1].type === "rest" ? 2 : 1;
+    const copy = q.slice();
+    const moved = copy.splice(i, take);
+    return [...copy, ...moved];
+  });
+  const reorderQueue = (ids) => setQueue((q) => ids.map((id) => q.find((x) => x.id === id)).filter(Boolean));
 
   const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
   const isSectionRest = block.type === "rest";
@@ -2886,4 +2936,3 @@ function Catalog() {
 }
 
 window.Catalog = Catalog;
-
