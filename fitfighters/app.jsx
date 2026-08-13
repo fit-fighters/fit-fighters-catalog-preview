@@ -1081,27 +1081,48 @@ window.ExerciseDetailScreen = ExerciseDetailScreen;
 // ── ChangeExercise.jsx ────────────────────────────────────────────
 // FitFighters mobile — Change exercise: player up top, alternatives list below, tap-to-preview then confirm.
 
-function ChangeExerciseRow({ item, isCurrent, isSelected, onTap }) {
+function ChangeExerciseCarousel({ items, activeIdx, onPick, scrollRef }) {
+  const CARD = 132, GAP = 12;
+  const onScroll = (e) => {
+    const el = e.currentTarget;
+    const idx = Math.round(el.scrollLeft / (CARD + GAP));
+    if (idx !== activeIdx && idx >= 0 && idx < items.length) onPick(idx, true);
+  };
   return (
     <div
-      onClick={isCurrent ? undefined : onTap}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
-        cursor: isCurrent ? "default" : "pointer",
-        background: isSelected ? "rgba(255,50,0,0.08)" : "transparent",
-        borderLeft: isSelected ? "2px solid var(--ff-red)" : "2px solid transparent",
-        opacity: isCurrent ? 0.5 : 1,
-      }}
+      ref={scrollRef}
+      onScroll={onScroll}
+      style={{ display: "flex", gap: GAP, overflowX: "auto", scrollSnapType: "x mandatory", padding: "0 16px 4px", scrollbarWidth: "none", flexShrink: 0 }}
     >
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
-        {item.img ? <img src={item.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{item.name}</p>
-        {item.muscles && <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "3px 0 0" }}>{item.muscles.join(", ")}</p>}
-      </div>
-      {isCurrent && <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--ff-text-3)", background: "var(--ff-surface-2)", padding: "2px 7px", borderRadius: 999, flexShrink: 0 }}>ACTUAL</span>}
-      {isSelected && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12" /></svg>}
+      {items.map((it, i) => {
+        const active = i === activeIdx;
+        return (
+          <div key={it.name} onClick={() => onPick(i)} style={{ width: CARD, flexShrink: 0, scrollSnapAlign: "center", cursor: "pointer" }}>
+            <div style={{ width: CARD, height: 94, borderRadius: 12, overflow: "hidden", background: "var(--ff-surface-2)", border: active ? "2px solid var(--ff-red)" : "1px solid var(--ff-border)", opacity: active ? 1 : 0.55, position: "relative" }}>
+              {it.img ? <img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+              {i === 0 && (
+                <span style={{ position: "absolute", top: 6, left: 6, fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "#fff", background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "2px 7px" }}>ACTUAL</span>
+              )}
+            </div>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: active ? "var(--ff-text)" : "var(--ff-text-3)", margin: "6px 0 0", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.name}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChangeExerciseCues({ item, tone = "dark" }) {
+  const cues = item.cues || (window.FF_DATA.exerciseCues || {})[item.name] || (item.instructions || []).slice(0, 2);
+  if (!cues || !cues.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {cues.slice(0, 3).map((c, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <span style={{ width: 4, height: 4, borderRadius: "50%", background: tone === "dark" ? "var(--ff-text-3)" : "rgba(255,255,255,.5)", marginTop: 7, flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: tone === "dark" ? "var(--ff-text-2)" : "rgba(255,255,255,.8)", lineHeight: 1.45 }}>{c}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1111,49 +1132,70 @@ function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
   const info = getExerciseInfo(ex.name);
   const pool = poolOverride || window.FF_DATA.changeExercisePool || [];
   const relatedPool = pool.filter(p => p.name !== ex.name);
-  const [selected, setSelected] = React.useState(null);
-  const preview = selected || { name: ex.name, img: ex.img, videoUrl: info.videoUrl };
+  const items = [{ name: ex.name, img: ex.img, videoUrl: info.videoUrl, muscles: info.muscles, instructions: info.instructions }, ...relatedPool];
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const [playKey, setPlayKey] = React.useState(0);
+  const railRef = React.useRef(null);
+  const preview = items[activeIdx] || items[0];
+  const selected = activeIdx > 0 ? items[activeIdx] : null;
+
+  // Deslizar el carrusel cambia el reproductor; tocar una tarjeta lo centra y reproduce su video.
+  const pick = (i, fromScroll) => {
+    setActiveIdx(i);
+    setPlayKey((k) => k + 1);
+    if (!fromScroll && railRef.current) railRef.current.scrollTo({ left: i * 144, behavior: "smooth" });
+  };
+
+  const emptyState = (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "8px 20px 20px" }}>
+      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+      </div>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0 }}>No hay ejercicios disponibles</p>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0, lineHeight: 1.5, maxWidth: 260 }}>No encontramos alternativas para este ejercicio por ahora.</p>
+    </div>
+  );
+
+  const cta = (
+    <Button variant="primary" disabled={!selected} onClick={() => selected && onConfirm(selected)}>
+      {selected ? `Cambiar a ${selected.name}` : "Selecciona un ejercicio"}
+    </Button>
+  );
+
+  const media = (fit) => (
+    preview.videoUrl ? (
+      <video key={preview.videoUrl + playKey} src={preview.videoUrl} poster={preview.img} controls autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: fit, display: "block" }} />
+    ) : preview.img ? (
+      <img src={preview.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    ) : null
+  );
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar ejercicio">
       <AppBar variant="title" title="Cambiar ejercicio" showBack onBack={onBack} />
 
-      <div style={{ width: "100%", height: 200, background: "#000", flexShrink: 0, position: "relative" }}>
-        {preview.videoUrl ? (
-          <video key={preview.videoUrl} src={preview.videoUrl} poster={preview.img} controls loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-        ) : preview.img ? (
-          <img src={preview.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        ) : null}
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "18px 16px 8px", background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)", pointerEvents: "none" }}>
-          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "#fff", margin: 0 }}>{preview.name}</p>
+      <div style={{ width: "100%", paddingTop: "56.25%", background: "#000", position: "relative", flexShrink: 0, minHeight: 0, overflow: "hidden" }}>
+        {media("contain")}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{preview.name}</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: 0 }}>
+            {(preview.muscles && preview.muscles.length ? preview.muscles.join(", ") : "Sin grupo muscular")}{activeIdx === 0 ? " · Ejercicio actual" : ""}
+          </p>
         </div>
+        <ChangeExerciseCues item={preview} />
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "8px 16px 4px" }}>Ejercicios relacionados</p>
-        <ChangeExerciseRow item={{ name: ex.name, img: ex.img }} isCurrent />
-        <div style={{ borderTop: "1px solid var(--ff-border)" }} />
-        {relatedPool.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "36px 20px" }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-            </div>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0 }}>No hay ejercicios disponibles</p>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0, lineHeight: 1.5, maxWidth: 260 }}>No encontramos alternativas para este ejercicio por ahora.</p>
-          </div>
-        ) : relatedPool.map((item, i) => (
-          <React.Fragment key={item.name}>
-            <ChangeExerciseRow item={item} isSelected={selected?.name === item.name} onTap={() => setSelected(item)} />
-            <div style={{ borderTop: "1px solid var(--ff-border)" }} />
-          </React.Fragment>
-        ))}
-      </div>
+      {items.length > 1 ? (
+        <div style={{ flexShrink: 0, paddingTop: 4 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 16px 8px" }}>Ejercicios relacionados</p>
+          <ChangeExerciseCarousel items={items} activeIdx={activeIdx} onPick={pick} scrollRef={railRef} />
+        </div>
+      ) : emptyState}
 
-      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)" }}>
-        <Button variant="primary" disabled={!selected} onClick={() => selected && onConfirm(selected)}>
-          {selected ? `Cambiar a ${selected.name}` : "Selecciona un ejercicio"}
-        </Button>
-      </div>
+      <div style={{ flexShrink: 0, padding: "14px 16px 28px" }}>{cta}</div>
     </div>
   );
 }
@@ -1257,8 +1299,10 @@ window.ProfileScreen = ProfileScreen;
 // Stripset, looping EMOM, dual-timer Cardio (traditional/interval), and both Rest variants
 // (standalone section rest vs. inter-exercise overlay).
 
+// Los tabs están siempre visibles durante el ejercicio activo. Salir del tab "Ejercicio"
+// pausa automáticamente (para no perder segundos en bloques por tiempo); volver no reanuda.
 const PAUSE_TABS = [
-  { id: "pausa", label: "Pausa" },
+  { id: "ejercicio", label: "Ejercicio" },
   { id: "cola", label: "Cola" },
   { id: "instrucciones", label: "Instrucciones" },
 ];
@@ -1488,6 +1532,7 @@ function QueueRestLine({ rest }) {
 
 function TrainerQueueRow({ block, rest, isExpanded, onToggleExpand, onPostpone, onDragStart, onDragOver, onDrop }) {
   const primary = blockPrimary(block);
+  const primaryImg = primary.img;
   const expandList = blockExpandList(block);
   const canExpand = expandList.length > 1;
   return (
@@ -1497,8 +1542,9 @@ function TrainerQueueRow({ block, rest, isExpanded, onToggleExpand, onPostpone, 
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
         </span>
         <div onClick={canExpand ? onToggleExpand : undefined} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, cursor: canExpand ? "pointer" : "default" }}>
-          <SectionBadge type={block.type} showLabel={false} />
+          <TrainerThumb img={primaryImg} size={52} />
           <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ marginBottom: 4 }}><SectionBadge type={block.type} /></div>
             <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "#fff", margin: 0, lineHeight: 1.3, overflowWrap: "anywhere", textWrap: "pretty" }}>{queueTitle(block)}</p>
             <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.45)", margin: "2px 0 0", textTransform: "uppercase", letterSpacing: ".03em" }}>{primary.meta}</p>
           </div>
@@ -1511,8 +1557,8 @@ function TrainerQueueRow({ block, rest, isExpanded, onToggleExpand, onPostpone, 
       {isExpanded && canExpand && (
         <div style={{ padding: "0 0 12px 26px", display: "flex", flexDirection: "column", gap: 10 }}>
           {expandList.map((it, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <TrainerThumb img={it.img} size={26} />
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <TrainerThumb img={it.img} size={42} />
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" style={{ flexShrink: 0 }}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.7)", flex: 1, minWidth: 0, lineHeight: 1.4 }}>{it.name}</span>
               <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.4)", flexShrink: 0 }}>{it.meta}</span>
@@ -1580,16 +1626,31 @@ function TrainerQueueTab({ queue, expandedId, onToggleExpand, onPostpone, onReor
   );
 }
 
+// Instrucciones en formato resumido: claves cortas escritas para el entrenador.
+// Sin claves autoradas, mostramos las 2 primeras instrucciones completas (nunca cortadas).
 function TrainerInstructionsTab({ exercise, onWatchVideo }) {
   const ex = exercise || {};
-  const instructions = ex.instructions || [];
+  const authored = ex.cues || (window.FF_DATA.exerciseCues || {})[ex.name];
+  const isCue = !!(authored && authored.length);
+  const instructions = isCue ? authored.slice(0, 3) : (ex.instructions || []).slice(0, 2);
+  const muscles = ex.muscles || [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "#fff", margin: 0, textAlign: "center" }}>{ex.name}</p>
+      {muscles.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+          {muscles.map((m) => (
+            <span key={m} style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "3px 9px" }}>{m}</span>
+          ))}
+        </div>
+      )}
       {instructions.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {instructions.map((step, i) => (
-            <p key={i} style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.7)", margin: 0, lineHeight: 1.6 }}>{i + 1}. {step}</p>
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,.4)", marginTop: 7, flexShrink: 0 }} />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: isCue ? 13 : 12.5, color: "rgba(255,255,255,.72)", lineHeight: isCue ? 1.45 : 1.4 }}>{step}</span>
+            </div>
           ))}
         </div>
       ) : (
@@ -1697,7 +1758,7 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
   const blocks = window.FF_DATA.trainerBlocks;
   const [blockIdx, setBlockIdx] = React.useState(initialBlockIndex);
   const [paused, setPaused] = React.useState(initialPaused);
-  const [pauseTab, setPauseTab] = React.useState(initialPauseTab);
+  const [pauseTab, setPauseTab] = React.useState(initialPauseTab === "pausa" ? "ejercicio" : initialPauseTab);
   const [sessionElapsed, setSessionElapsed] = React.useState(0);
   const [run, setRun] = React.useState(() => {
     const r = makeRun(blocks[initialBlockIndex]);
@@ -1712,6 +1773,12 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
   const transitionLock = React.useRef(false);
 
   const block = blocks[blockIdx];
+
+  // Consultar Cola o Instrucciones pausa el bloque; volver a "Ejercicio" no reanuda solo.
+  const selectTab = (t) => {
+    if (t !== "ejercicio") setPaused(true);
+    setPauseTab(t);
+  };
 
   const goToBlock = (i) => {
     if (lockBlock) { setRun(makeRun(blocks[blockIdx])); setPreroll(blocks[blockIdx].type === "rest" ? null : 3); return; }
@@ -1790,6 +1857,8 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
   const display = !isSectionRest ? getDisplay(block, run) : null;
   const numberColor = display && display.isRestPhase ? "var(--ff-section-rest, #6B7A8D)" : color;
 
+  const pauseNow = () => { setPaused(true); setPauseTab("ejercicio"); };
+  const resume = () => { setPaused(false); setPauseTab("ejercicio"); if (block.type !== "rest") setPreroll(3); };
   const askExit = () => setConfirmExit(true);
   const askStop = () => setConfirmStop(true);
 
@@ -1812,134 +1881,110 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
           <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color }}>{(SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label}</span>
         </div>
         {paused && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.85)" }}>En pausa</span>
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", padding: "20px 20px", gap: 16, minHeight: 0 }}>
-        {!paused && isInterRest && <InterRestOverlay seconds={run.restRemaining} nextName={block.exercises[run.steps[run.stepIdx + 1].exIdx].name} onSkip={() => setRun((r) => startStepInRun(r, r.stepIdx + 1))} />}
+      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        {/* Tabs siempre visibles, también con el ejercicio en curso */}
+        <TrainerTabBar active={pauseTab} onChange={selectTab} color={color} />
 
-        {!paused && isSectionRest && (
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", textAlign: "center", margin: 0 }}>Descanso entre secciones</p>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
-              <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.remaining)}</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Tiempo restante</span>
-              {nextBlockPrimary && <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.45)", textAlign: "center", margin: "12px 0 0" }}>Próximo: {nextBlockPrimary.name}</p>}
-              <button onClick={nextBlock} style={{ marginTop: 14, padding: "8px 18px", borderRadius: 999, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 12, cursor: "pointer" }}>Saltar descanso</button>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 40 }}>
-              <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => { setPaused(true); setPauseTab("pausa"); }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
-              </TrainerCtrlBtn>
-              <TrainerCtrlBtn label="Saltar" color={color} onClick={nextBlock}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
-              </TrainerCtrlBtn>
-            </div>
-          </div>
-        )}
+        <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0, padding: "14px 20px 16px", overflowY: pauseTab === "ejercicio" ? "hidden" : "auto" }}>
+          {pauseTab === "ejercicio" && !paused && isInterRest && !isSectionRest && (
+            <InterRestOverlay seconds={run.restRemaining} nextName={block.exercises[run.steps[run.stepIdx + 1].exIdx].name} onSkip={() => setRun((r) => startStepInRun(r, r.stepIdx + 1))} />
+          )}
 
-        {!paused && !isSectionRest && !isInterRest && (
-          <>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{curInfo.name}</p>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
-              {display.timer && (
-                <div style={{ display: "flex", alignItems: "baseline", gap: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "5px 14px", marginBottom: 10 }}>
-                  <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", lineHeight: 1 }}>{display.timer.v}</span>
-                  <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>{display.timer.l}</span>
+          {pauseTab === "ejercicio" && isSectionRest && (
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1, gap: 14, minHeight: 0 }}>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", textAlign: "center", margin: 0 }}>Descanso entre secciones</p>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.remaining)}</span>
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Tiempo restante</span>
+                {nextBlockPrimary && <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.45)", textAlign: "center", margin: "12px 0 0" }}>Próximo: {nextBlockPrimary.name}</p>}
+                {!paused && <button onClick={nextBlock} style={{ marginTop: 14, padding: "8px 18px", borderRadius: 999, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-body)", fontSize: 12, cursor: "pointer" }}>Saltar descanso</button>}
+              </div>
+            {paused ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Button variant="primary" onClick={resume}>Reanudar</Button>
+                <button onClick={askStop} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Finalizar entrenamiento</button>
+              </div>
+            ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 40 }}>
+                  <TrainerCtrlBtn label="Pausar" primary color={color} onClick={pauseNow}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                  </TrainerCtrlBtn>
+                  <TrainerCtrlBtn label="Saltar" color={color} onClick={nextBlock}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
+                  </TrainerCtrlBtn>
                 </div>
-              )}
-              <span style={{ fontFamily: "var(--font-display)", fontSize: display.bigSize || 60, color: numberColor, lineHeight: 1, textShadow: `0 0 40px color-mix(in srgb, ${numberColor} 35%, transparent)` }}>{display.big}</span>
-              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{display.label}</span>
-              {display.sub && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "rgba(255,255,255,.45)", marginTop: 2 }}>{display.sub}</span>}
-              {display.panel && (
-                <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 10 }}>
-                  {display.panel.map((p, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />}
-                      <TrainerPanelItem value={p.v} label={p.l} />
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
+            )}
             </div>
-          </>
-        )}
+          )}
 
-        {!paused && !isSectionRest && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <TrainerCtrlBtn label="Anterior" color={color} onClick={onAnterior}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={anteriorEnabled ? "#fff" : "rgba(255,255,255,.25)"} strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>
-            </TrainerCtrlBtn>
-            <TrainerCtrlBtn label="Pausar" primary color={color} onClick={() => { setPaused(true); setPauseTab("pausa"); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
-            </TrainerCtrlBtn>
-            <TrainerCtrlBtn label={siguienteLabel} color={color} onClick={onSiguiente}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
-            </TrainerCtrlBtn>
-            <TrainerCtrlBtn label="Sonido" color={color}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>
-            </TrainerCtrlBtn>
-          </div>
-        )}
-
-        {paused && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-            <TrainerTabBar active={pauseTab} onChange={setPauseTab} color={color} />
-            <div style={{ flex: 1, overflowY: "auto", padding: "14px 0 4px" }}>
-              {pauseTab === "pausa" && (
-                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "100%", minHeight: 360 }}>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{curInfo.name}</p>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                    {isSectionRest ? (
-                      <>
-                        <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.remaining)}</span>
-                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Descanso</span>
-                      </>
-                    ) : isInterRest ? (
-                      <>
-                        <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.restRemaining)}</span>
-                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Descanso entre ejercicios</span>
-                      </>
-                    ) : (
-                      <>
-                        {display.timer && (
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "5px 14px", marginBottom: 8 }}>
-                            <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", lineHeight: 1 }}>{display.timer.v}</span>
-                            <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>{display.timer.l}</span>
-                          </div>
-                        )}
-                        <span style={{ fontFamily: "var(--font-display)", fontSize: display.bigSize || 60, color: numberColor, lineHeight: 1 }}>{display.big}</span>
-                        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{display.label}</span>
-                        {display.panel && (
-                          <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 10 }}>
-                            {display.panel.map((p, i) => (
-                              <React.Fragment key={i}>
-                                {i > 0 && <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />}
-                                <TrainerPanelItem value={p.v} label={p.l} />
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        )}
-                      </>
+          {pauseTab === "ejercicio" && !isSectionRest && (
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 14, minHeight: 0 }}>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", lineHeight: 1.35, textAlign: "center", margin: 0 }}>{isInterRest ? "Descanso entre ejercicios" : curInfo.name}</p>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1, justifyContent: "center" }}>
+                {isInterRest ? (
+                  <>
+                    <span style={{ fontFamily: "var(--font-display)", fontSize: 60, color: "var(--ff-section-rest, #6B7A8D)", lineHeight: 1 }}>{fmtCountdown(run.restRemaining)}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>Descanso</span>
+                  </>
+                ) : (
+                  <>
+                    {display.timer && (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 999, padding: "5px 14px", marginBottom: 10 }}>
+                        <span style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", lineHeight: 1 }}>{display.timer.v}</span>
+                        <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>{display.timer.l}</span>
+                      </div>
                     )}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <Button variant="primary" onClick={() => { setPaused(false); if (block.type !== "rest") setPreroll(3); }}>Reanudar</Button>
-                    <button onClick={askStop} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Finalizar entrenamiento</button>
-                  </div>
+                    <span style={{ fontFamily: "var(--font-display)", fontSize: display.bigSize || 60, color: numberColor, lineHeight: 1, textShadow: paused ? "none" : `0 0 40px color-mix(in srgb, ${numberColor} 35%, transparent)` }}>{display.big}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>{display.label}</span>
+                    {display.panel && (
+                      <div style={{ display: "flex", alignItems: "center", alignSelf: "center", background: "rgba(255,255,255,0.05)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", padding: "8px 0", marginTop: 10 }}>
+                        {display.panel.map((p, i) => (
+                          <React.Fragment key={i}>
+                            {i > 0 && <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.1)" }} />}
+                            <TrainerPanelItem value={p.v} label={p.l} />
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            {paused ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Button variant="primary" onClick={resume}>Reanudar</Button>
+                <button onClick={askStop} style={{ width: "100%", padding: 13, borderRadius: 10, background: "rgba(255,50,0,0.12)", border: "1px solid rgba(255,50,0,0.3)", color: "var(--ff-error)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }}>Finalizar entrenamiento</button>
+              </div>
+            ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <TrainerCtrlBtn label="Anterior" color={color} onClick={onAnterior}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={anteriorEnabled ? "#fff" : "rgba(255,255,255,.25)"} strokeWidth="2"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>
+                  </TrainerCtrlBtn>
+                  <TrainerCtrlBtn label="Pausar" primary color={color} onClick={pauseNow}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                  </TrainerCtrlBtn>
+                  <TrainerCtrlBtn label={siguienteLabel} color={color} onClick={onSiguiente}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>
+                  </TrainerCtrlBtn>
+                  <TrainerCtrlBtn label="Sonido" color={color}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>
+                  </TrainerCtrlBtn>
                 </div>
-              )}
-              {pauseTab === "cola" && (
-                <TrainerQueueTab queue={queue} expandedId={expandedBlockId} onToggleExpand={setExpandedBlockId} onPostpone={postponeBlock} onReorder={reorderQueue} />
-              )}
-              {pauseTab === "instrucciones" && <TrainerInstructionsTab exercise={curInfo} onWatchVideo={() => setShowVideo(true)} />}
+            )}
             </div>
-          </div>
-        )}
+          )}
+
+          {pauseTab === "cola" && (
+            <TrainerQueueTab queue={queue} expandedId={expandedBlockId} onToggleExpand={setExpandedBlockId} onPostpone={postponeBlock} onReorder={reorderQueue} />
+          )}
+          {pauseTab === "instrucciones" && <TrainerInstructionsTab exercise={curInfo} onWatchVideo={() => setShowVideo(true)} />}
+        </div>
       </div>
       {!paused && prerollShown !== null && <CountdownModal n={prerollShown} color={color} exerciseName={curInfo.name} />}
       {showVideo && <TrainerVideoScreen exercise={curInfo} onClose={() => setShowVideo(false)} />}
@@ -2859,7 +2904,7 @@ function Catalog() {
       title: "Detalle de ejercicio",
       cells: [
         { label: "Detalle de ejercicio", note: "Con músculos e instrucciones", el: <ExerciseDetailScreen exercise={window.FF_DATA.routineDetailBlocks[0].exercises[0]} onBack={noop} onChangeExercise={noop} /> },
-        { label: "Cambiar ejercicio", note: "Sin selección", el: <ChangeExerciseScreen exercise={window.FF_DATA.routineDetailBlocks[0].exercises[0]} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar ejercicio", note: "Carrusel + claves del ejercicio", el: <ChangeExerciseScreen exercise={window.FF_DATA.routineDetailBlocks[0].exercises[0]} onBack={noop} onConfirm={noop} /> },
         { label: "Cambiar ejercicio", note: "Sin ejercicios relacionados", el: <ChangeExerciseScreen exercise={{ name: "Ejercicio sin alternativas", img: null }} poolOverride={[]} onBack={noop} onConfirm={noop} /> },
       ],
     },
