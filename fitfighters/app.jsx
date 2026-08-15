@@ -754,6 +754,30 @@ function TutorialScreen({ tab, onTab }) {
   );
 }
 
+// FitFighters mobile — Work-in-progress placeholder for sections not built yet.
+function WipScreen({ title = "Próximamente", onBack }) {
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="En construcción">
+      <AppBar variant="title" title={title} showBack onBack={onBack} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px 80px", textAlign: "center", gap: 20 }}>
+        <div style={{ width: 72, height: 72, borderRadius: 18, background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", lineHeight: 1.35, letterSpacing: "-.3px", margin: "0 0 12px" }}>Estamos trabajando en esta sección</h1>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 auto", maxWidth: 290 }}>
+            Queremos que tengas la mejor experiencia dentro de FitFighters, así que le estamos dedicando el tiempo que se merece. Gracias por tu paciencia y por seguir formando parte de esta gran comunidad.
+          </p>
+        </div>
+        <Badge variant="neutral">En construcción</Badge>
+      </div>
+    </div>
+  );
+}
+window.WipScreen = WipScreen;
+
 // Row for one day of the week's routine
 function WeekDayRow({ item, isLast, onClick, rowRef }) {
   const { day, routine, type, status, date } = item;
@@ -2960,6 +2984,12 @@ function Catalog() {
         { label: "Historial", el: <GenerationHistoryScreen onBack={noop} /> },
         { label: "Detalle de generación", el: <GenerationHistoryScreen initialSelectedId={1} onBack={noop} /> },
         { label: "Historial vacío", el: <GenerationHistoryScreen generationsOverride={[]} onBack={noop} /> },
+      ],
+    },
+    {
+      title: "En construcción",
+      cells: [
+        { label: "Sección en desarrollo", el: <WipScreen title="Chat" onBack={noop} /> },
       ],
     },
   ];
