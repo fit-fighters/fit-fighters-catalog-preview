@@ -21,10 +21,12 @@
 
   /* ── Radius (Shape.kt) ────────────────── */
   --radius-cta:    10px;  /* CtaButtonShape — primary/secondary buttons */
+  --radius-field:   8px;  /* campos de texto filled (Sep 2026) */
   --radius-md:     12px;  /* standard cards, text fields use large */
   --radius-lg:     14px;  /* larger cards, text fields, chips */
   --radius-card:   16px;  /* section / content cards (rounded 16 in code) */
   --radius-xl:     32px;  /* pills, bottom sheets */
+  --radius-sheet:  32px;  /* bottom sheets — esquinas superiores */
   --radius-full:   999px; /* circular — avatars, control buttons */
 
   /* ── Borders ──────────────────────────── */

@@ -251,36 +251,54 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
  * Selected = filled (onPrimaryContainer/onSurface inverse); unselected = surface + outline.
  * Used for onboarding muscle groups, level pickers, day pickers.
  */
+/**
+ * FitFighters selectable chip.
+ *  - variant="filled" (default): onboarding muscle groups, levels. Selected = inverted fill.
+ *  - variant="pill": filtros, días y semanas en pantallas claras. Selected = borde y texto rojos.
+ */
 function Chip({
   children,
   selected = false,
+  variant = "filled",
   onClick,
   style = {},
   ...rest
 }) {
+  const pill = variant === "pill";
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    fontFamily: "var(--font-body)",
+    fontWeight: "var(--weight-medium)",
+    textAlign: "center",
+    cursor: "pointer",
+    transition: "all .15s ease",
+    WebkitTapHighlightColor: "transparent",
+    userSelect: "none"
+  };
+  const skin = pill ? {
+    minHeight: "36px",
+    padding: "0 14px",
+    fontSize: "12.5px",
+    borderRadius: "var(--radius-full)",
+    background: selected ? "var(--ff-primary-container)" : "var(--ff-surface)",
+    color: selected ? "var(--ff-red-light)" : "var(--ff-text)",
+    border: selected ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)"
+  } : {
+    minHeight: "45px",
+    padding: "10px 16px",
+    fontSize: "13px",
+    borderRadius: "var(--radius-lg)",
+    background: selected ? "var(--ff-text)" : "var(--ff-surface)",
+    color: selected ? "var(--ff-bg)" : "var(--ff-text)",
+    border: `1px solid ${selected ? "var(--ff-text)" : "var(--ff-border)"}`
+  };
   return /*#__PURE__*/React.createElement("button", _extends({
     type: "button",
     onClick: onClick,
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "45px",
-      padding: "10px 16px",
-      fontFamily: "var(--font-body)",
-      fontSize: "13px",
-      fontWeight: "var(--weight-medium)",
-      textAlign: "center",
-      borderRadius: "var(--radius-lg)",
-      cursor: "pointer",
-      transition: "all .15s ease",
-      WebkitTapHighlightColor: "transparent",
-      userSelect: "none",
-      background: selected ? "var(--ff-text)" : "var(--ff-surface)",
-      color: selected ? "var(--ff-bg)" : "var(--ff-text)",
-      border: `1px solid ${selected ? "var(--ff-text)" : "var(--ff-border)"}`,
-      ...style
-    },
+    style: { ...base, ...skin, ...style },
     onMouseDown: e => e.currentTarget.style.opacity = "0.8",
     onMouseUp: e => e.currentTarget.style.opacity = "1",
     onMouseLeave: e => e.currentTarget.style.opacity = "1"
@@ -296,6 +314,11 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
  * FitFighters outlined text field. Mirrors FFTextField.
  * Floating label, password reveal, error + supporting text, read-only.
  * Focus accent is green (--ff-green), matching the app.
+ */
+/**
+ * FitFighters text field — "filled" claro (Sep 2026): 56px, relleno --ff-surface
+ * sobre el lienzo gris de la app, sin borde. El label vive dentro y se eleva al
+ * escribir; el foco marca una línea inferior verde (error = roja).
  */
 function TextField({
   label,
@@ -314,39 +337,36 @@ function TextField({
 }) {
   const [focused, setFocused] = React.useState(false);
   const [reveal, setReveal] = React.useState(false);
-  const hasValue = value != null && String(value).length > 0;
-  const floated = focused || hasValue;
-  const accent = error ? "var(--ff-error)" : focused ? "var(--ff-green)" : "var(--ff-border)";
-  const labelColor = error ? "var(--ff-error)" : focused ? "var(--ff-green)" : "var(--ff-text-2)";
+  const floated = focused || (value != null && String(value).length > 0);
+  const accent = error ? "var(--ff-error)" : focused ? "var(--ff-green)" : null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       width: "100%",
       fontFamily: "var(--font-body)",
+      opacity: disabled ? 0.55 : 1,
+      pointerEvents: disabled ? "none" : "auto",
       ...style
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
-      display: "flex",
-      alignItems: "center",
-      background: "transparent",
-      border: `1px solid ${accent}`,
-      borderRadius: "var(--radius-lg)",
-      padding: "0 14px",
       height: "56px",
-      opacity: disabled ? 0.5 : 1,
-      transition: "border-color .15s ease"
+      borderRadius: "var(--radius-field)",
+      background: "var(--ff-surface)",
+      padding: "0 14px",
+      display: "flex",
+      alignItems: "flex-end",
+      boxShadow: accent ? `inset 0 -2px 0 ${accent}` : "none",
+      transition: "box-shadow .15s ease"
     }
-  }, /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
       position: "absolute",
-      left: floated ? "12px" : "14px",
-      top: floated ? "-8px" : "50%",
+      left: "14px",
+      top: floated ? "8px" : "50%",
       transform: floated ? "none" : "translateY(-50%)",
       fontSize: floated ? "11px" : "15px",
-      color: labelColor,
-      background: floated ? "var(--ff-bg)" : "transparent",
-      padding: floated ? "0 4px" : "0",
+      color: error ? "var(--ff-error)" : focused ? "var(--ff-green)" : "var(--ff-text-3)",
       pointerEvents: "none",
       transition: "all .15s ease"
     }
@@ -361,14 +381,16 @@ function TextField({
     onBlur: () => setFocused(false),
     style: {
       flex: 1,
+      minWidth: 0,
       background: "transparent",
       border: "none",
       outline: "none",
       color: "var(--ff-text)",
       fontFamily: "var(--font-body)",
       fontSize: "15px",
-      height: "100%",
-      width: "100%"
+      height: "32px",
+      padding: 0,
+      marginBottom: "6px"
     }
   }, rest)), password ? /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -378,8 +400,9 @@ function TextField({
       border: "none",
       cursor: "pointer",
       padding: "4px",
+      marginBottom: "4px",
       display: "flex",
-      opacity: 0.7
+      opacity: 0.6
     },
     "aria-label": reveal ? "Ocultar" : "Mostrar"
   }, /*#__PURE__*/React.createElement("span", {
@@ -397,7 +420,9 @@ function TextField({
       WebkitMaskPosition: "center",
       maskPosition: "center"
     }
-  })) : trailingIcon), supportingText ? /*#__PURE__*/React.createElement("p", {
+  })) : trailingIcon ? /*#__PURE__*/React.createElement("span", {
+    style: { display: "flex", marginBottom: "10px", color: "var(--ff-text-2)" }
+  }, trailingIcon) : null), supportingText ? /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "6px 14px 0",
       fontSize: "11px",
@@ -2319,7 +2344,7 @@ function MilestoneScreen({
       color: "var(--ff-text)",
       fontWeight: 600
     }
-  }, "Novatos gym \u2014 Nivel 2")), /*#__PURE__*/React.createElement("div", {
+  }, "Novatos gym — Nivel 2")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -2714,7 +2739,7 @@ function ProfileScreen({
       color: "var(--ff-text)",
       fontWeight: 500
     }
-  }, "fitfighters.com"), " \u2014 renovaciones, cambios de plan y m\xE1s."), /*#__PURE__*/React.createElement("div", {
+  }, "fitfighters.com"), " — renovaciones, cambios de plan y m\xE1s."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -4665,6 +4690,93 @@ window.FF_DATA = window.FF_DATA || {
 };
 })(); } catch (e) { __ds_ns.__errors.push({ path: "ui_kits/mobile/screens/data.js", error: String((e && e.message) || e) }); }
 
+// components/navigation/CircleIconBtn.jsx
+try { (() => {
+/**
+ * Control circular de 40px — volver / cerrar. Es el único botón de chrome
+ * flotante del producto: gris translúcido sobre superficie clara, negro
+ * translúcido con blur sobre vídeo o imagen (onMedia), sin relleno cuando la
+ * app bar ya se volvió sólida al hacer scroll (plain).
+ */
+function CircleIconBtn({ kind = "back", onClick, onMedia = false, plain = false, ariaLabel, style = {} }) {
+  const stroke = onMedia ? "#fff" : "var(--ff-text)";
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClick,
+    "aria-label": ariaLabel || (kind === "close" ? "Cerrar" : "Atrás"),
+    style: {
+      width: "40px", height: "40px", borderRadius: "50%", border: "none", flexShrink: 0,
+      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+      background: plain ? "transparent" : onMedia ? "var(--ff-control-on-media)" : "var(--ff-control)",
+      backdropFilter: onMedia ? "blur(6px)" : "none",
+      WebkitBackdropFilter: onMedia ? "blur(6px)" : "none",
+      transition: "background .2s ease",
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+    stroke: stroke, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round"
+  }, kind === "close" ? /*#__PURE__*/React.createElement("g", null,
+      /*#__PURE__*/React.createElement("line", { x1: 18, y1: 6, x2: 6, y2: 18 }),
+      /*#__PURE__*/React.createElement("line", { x1: 6, y1: 6, x2: 18, y2: 18 })
+    ) : /*#__PURE__*/React.createElement("path", { d: "M19 12H5M12 5l-7 7 7 7" })));
+}
+
+/**
+ * App bar flotante de 56px: transparente sobre el contenido, con sólo el
+ * control circular visible. Al hacer scroll (scrolled) toma el fondo de la
+ * pantalla, aparece el título y una línea de 1px. Se posiciona en absoluto
+ * dentro del contenedor de pantalla.
+ */
+function FloatingTopBar({ title, onBack, onClose, scrolled = false, style = {} }) {
+  const spacer = () => /*#__PURE__*/React.createElement("span", { style: { width: "40px", flexShrink: 0 } });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, height: "56px",
+      display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px",
+      background: scrolled ? "var(--ff-bg)" : "transparent",
+      borderBottom: scrolled ? "1px solid var(--ff-border)" : "1px solid transparent",
+      transition: "background .2s ease, border-color .2s ease",
+      ...style
+    }
+  },
+    onBack ? /*#__PURE__*/React.createElement(CircleIconBtn, { kind: "back", onClick: onBack, plain: scrolled }) : spacer(),
+    /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "var(--font-display)", fontSize: "15px", color: "var(--ff-text)",
+        letterSpacing: "-.2px", opacity: scrolled ? 1 : 0, transition: "opacity .2s ease",
+        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+      }
+    }, title),
+    onClose ? /*#__PURE__*/React.createElement(CircleIconBtn, { kind: "close", onClick: onClose, plain: scrolled }) : spacer());
+}
+
+/**
+ * Bottom sheet: scrim --ff-scrim, superficie clara con radio 32 arriba y
+ * asa de 38x4. Para decisiones cortas (ámbito de un cambio, filtros, semanas).
+ */
+function BottomSheet({ title, subtitle, children, onDismiss, maxHeight = "70%", style = {} }) {
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onDismiss,
+    style: {
+      position: "absolute", inset: 0, zIndex: 20,
+      background: "var(--ff-scrim)", display: "flex", alignItems: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: "100%", background: "var(--ff-surface)", borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0",
+      padding: "10px 0 22px", maxHeight: maxHeight, overflowY: "auto", ...style
+    }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { width: "38px", height: "4px", borderRadius: "var(--radius-full)", background: "var(--ff-border)", margin: "0 auto 14px" } }),
+    title ? /*#__PURE__*/React.createElement("p", { style: { fontFamily: "var(--font-display)", fontSize: "16px", color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 20px 4px" } }, title) : null,
+    subtitle ? /*#__PURE__*/React.createElement("p", { style: { fontFamily: "var(--font-body)", fontSize: "12.5px", color: "var(--ff-text-2)", margin: "0 20px 12px" } }, subtitle) : null,
+    children));
+}
+Object.assign(__ds_scope, { CircleIconBtn, FloatingTopBar, BottomSheet });
+})(); } catch (e) { __ds_ns.__errors.push({ path: "components/navigation/CircleIconBtn.jsx", error: String((e && e.message) || e) }); }
+
 __ds_ns.Button = __ds_scope.Button;
 
 __ds_ns.Badge = __ds_scope.Badge;
@@ -4685,4 +4797,11 @@ __ds_ns.Card = __ds_scope.Card;
 
 __ds_ns.MenuRow = __ds_scope.MenuRow;
 
+__ds_ns.CircleIconBtn = __ds_scope.CircleIconBtn;
+
+__ds_ns.FloatingTopBar = __ds_scope.FloatingTopBar;
+
+__ds_ns.BottomSheet = __ds_scope.BottomSheet;
+
 })();
+

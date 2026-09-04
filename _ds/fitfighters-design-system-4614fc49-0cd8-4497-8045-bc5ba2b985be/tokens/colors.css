@@ -30,6 +30,11 @@
   /* primaryContainer — chip/badge fills */
   --ff-primary-container: rgba(255,50,0,0.15);
 
+  /* ── Chrome flotante ──────────────────── */
+  --ff-control:          rgba(255,255,255,0.08); /* botón circular sobre oscuro */
+  --ff-control-on-media: rgba(0,0,0,0.45);       /* botón circular sobre vídeo/imagen */
+  --ff-scrim:            rgba(0,0,0,0.35);       /* velo de bottom sheets y diálogos */
+
   /* ── Section type colors ──────────────── */
   /* Identify workout block types. Used directly — NOT via primary. */
   --ff-section-cycle:    #FF3200;
@@ -60,18 +65,46 @@
   --accent-on:       var(--ff-on-primary);
 }
 
-/* ── Light scheme ───────────────────────────────
-   Opt-in mirror. Apply [data-theme="light"] on a wrapper. */
+/* ── Light scheme (app surfaces, Sep 2026) ──────
+   La app móvil ahora usa superficies claras en todas las pantallas de
+   contenido. Aplica [data-theme="light"] en el contenedor de pantalla.
+   El rojo de acento no cambia; --ff-red-light pasa al rojo oscuro para
+   mantener contraste sobre blanco. */
 [data-theme="light"] {
-  --ff-bg:            #F5F5F5;
+  --ff-bg:            #E6E6E6;   /* lienzo de la app — blanco al 90% sobre el chasis oscuro */
   --ff-surface:       #FFFFFF;
-  --ff-surface-2:     #F0F0F0;
-  --ff-border:        #E0E0E0;
+  --ff-surface-2:     #F1F1F1;
+  --ff-border:        #E2E2E2;
   --ff-text:          #141414;
-  --ff-text-2:        #666666;
-  --ff-text-3:        #AAAAAA;
-  --ff-navbar:        #FFFFFF;
-  --ff-nav-indicator: rgba(255,50,0,0.10);
+  --ff-text-2:        #5C5C5C;
+  --ff-text-3:        #8E8E8E;
+  --ff-navbar:        #141414;
+  --ff-nav-indicator: rgba(255,50,0,0.15);
   --ff-red-light:     #CC2800;
   --ff-primary-container: rgba(255,50,0,0.10);
+  --ff-control:       rgba(20,20,20,0.06);  /* botón circular sobre claro */
+  --ff-scrim:         rgba(0,0,0,0.35);     /* velo de bottom sheets y diálogos */
+}
+
+/* ── Contexto oscuro dentro de pantalla clara ───
+   La bottom nav (y cualquier isla oscura) recupera la rampa dark. */
+[data-theme="dark-island"] {
+  --ff-surface:   #1A1A1A;
+  --ff-surface-2: #222222;
+  --ff-border:    #2A2A2A;
+  --ff-text:      #F0F0F0;
+  --ff-text-2:    #B5B5B5;
+  --ff-text-3:    #888888;
+}
+
+/* ── Sobre imagen / vídeo ───────────────────────
+   Controles y superficies translúcidas sobre media. */
+[data-theme="on-image"] {
+  --ff-bg:        transparent;
+  --ff-surface:   rgba(255,255,255,0.10);
+  --ff-surface-2: rgba(255,255,255,0.16);
+  --ff-border:    rgba(255,255,255,0.28);
+  --ff-text:      #FFFFFF;
+  --ff-text-2:    rgba(255,255,255,0.78);
+  --ff-text-3:    rgba(255,255,255,0.55);
 }

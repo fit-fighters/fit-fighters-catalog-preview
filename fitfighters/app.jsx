@@ -3,114 +3,187 @@ const { Button, AppBar, BottomNav, Card, MenuRow, Badge, SectionBadge, SECTION_T
 // FitFighters mobile — combined screens + orchestrator. Auto-assembled from ui_kits/mobile screens.
 
 // ── Login.jsx ───────────────────────────────────────────────────
-// FitFighters mobile — Login screen. Uses DS Button, TextField.
+// Autenticación aprobada (opción D): portada con imagen + tres accesos,
+// formulario de correo y registro sobre el fondo claro de la app.
 
-function GoogleIcon() {
+// Superficies claras estándar (mismas que el detalle de rutina aprobado).
+const APP_LIGHT = {
+  "--ff-surface": "#FFFFFF",
+  "--ff-surface-2": "#F1F1F1",
+  "--ff-border": "#E2E2E2",
+  "--ff-text": "#141414",
+  "--ff-text-2": "#5C5C5C",
+  "--ff-text-3": "#8E8E8E",
+  "--ff-red-light": "#CC2800",
+  "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+const APP_LIGHT_BG = { "--ff-bg": "rgba(255,255,255,0.90)" };
+// La barra inferior sigue siendo oscura: dentro de una pantalla clara recupera su rampa.
+const DARK_NAV_CONTEXT = {
+  "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222", "--ff-border": "#2A2A2A",
+  "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+// Superficies sobre imagen: blanco translúcido, texto blanco.
+const ON_IMAGE = {
+  "--ff-bg": "transparent",
+  "--ff-surface": "rgba(255,255,255,0.10)",
+  "--ff-surface-2": "rgba(255,255,255,0.16)",
+  "--ff-border": "rgba(255,255,255,0.28)",
+  "--ff-text": "#FFFFFF",
+  "--ff-text-2": "rgba(255,255,255,0.78)",
+  "--ff-text-3": "rgba(255,255,255,0.55)",
+};
+
+const LOGIN_IMG = "assets/login-bg.png";
+
+function LoginLinkRow({ onRegister, tone = "light" }) {
   return (
-    <span style={{
-      width: 18, height: 18, display: "block", background: "#fff",
-      WebkitMaskImage: `url(${window.__resources?.icGoogle || "assets/icons/ic_google.svg"})`, maskImage: `url(${window.__resources?.icGoogle || "assets/icons/ic_google.svg"})`,
-      WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat",
-    }} />
+    <p style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, color: tone === "light" ? "var(--ff-text-2)" : "rgba(255,255,255,.75)", margin: "16px 0 0" }}>
+      ¿No tienes cuenta? <span onClick={onRegister} style={{ color: tone === "light" ? "var(--ff-red-light)" : "#fff", fontWeight: 600, cursor: "pointer" }}>Regístrate</span>
+    </p>
   );
 }
 
-function LoginScreen({ onLogin, onRegister }) {
-  const [email, setEmail] = React.useState("eduardo@gmail.com");
-  const [pwd, setPwd] = React.useState("FitFighters1");
-
+// D · Sobre la B, pero sin formulario: tres accesos y nada más.
+function LoginChoiceScreen({ onLogin, onRegister }) {
+  const btn = {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", height: 50,
+    borderRadius: 10, cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px",
+  };
+  // Las redes van primero y sólidas en blanco: el contraste más alto posible sobre la foto.
+  const solid = { ...btn, background: "#FFFFFF", border: "none", color: "#101010", fontSize: 14.5 };
+  const ghost = { ...btn, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.28)", color: "#fff", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" };
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }}>
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 170px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 40 }}>
-          <img src={window.__resources?.ffLogoBrand || "assets/logos/ff_logo_brand.svg"} style={{ width: 190 }} alt="FitFighters" />
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", marginTop: 16, letterSpacing: ".02em" }}>
-            Entrena con propósito.
-          </p>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "#0F0F0F" }} data-screen-label="Login D">
+      <img src={LOGIN_IMG} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.58) 45%, rgba(0,0,0,0.86) 100%)" }} />
+      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 20px 30px" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingBottom: 24 }}>
+          <img src={window.__resources?.ffLogoBrand || "assets/logos/ff_logo_brand.svg"} style={{ width: 220 }} alt="FitFighters" />
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "14px 0 0", letterSpacing: ".02em" }}>Entrena de forma inteligente.</p>
         </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <TextField label="Correo electrónico" value={email} onChange={setEmail} />
-          <TextField label="Contraseña" value={pwd} onChange={setPwd} password />
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button onClick={onLogin} style={solid}>
+            <span style={{ width: 17, height: 17, display: "block", background: "#101010", WebkitMaskImage: `url(${window.__resources?.icGoogle || "assets/icons/ic_google.svg"})`, maskImage: `url(${window.__resources?.icGoogle || "assets/icons/ic_google.svg"})`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }} />
+            Continuar con Google
+          </button>
+          <button onClick={onLogin} style={solid}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.3-.1-2.6.8-3.3.8-.7 0-1.7-.8-2.8-.8-1.4 0-2.8.9-3.5 2.2-1.5 2.6-.4 6.5 1.1 8.6.7 1 1.6 2.2 2.7 2.1 1.1 0 1.5-.7 2.8-.7 1.3 0 1.6.7 2.7.7 1.1 0 1.9-1.1 2.6-2.1.5-.7.8-1.4 1-2-.1 0-2-.8-2-3.7zM14.3 5.9c.6-.7 1-1.7.9-2.7-.9.1-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 2-.5 2.5-1.2z" /></svg>
+            Continuar con Apple
+          </button>
+          <button onClick={onLogin} style={{ ...ghost, marginTop: 4 }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><polyline points="3 7 12 13 21 7" /></svg>
+            Ingresar con correo
+          </button>
         </div>
-
-        <div style={{ display: "flex", justifyContent: "center", margin: "14px 0 0" }}>
-          <Button variant="text">Olvidé mi contraseña</Button>
-        </div>
-      </div>
-
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "16px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
-        <Button variant="primary" fullWidth onClick={onLogin}>Iniciar sesión</Button>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
-          <div style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".1em" }}>o</span>
-          <div style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
-        </div>
-
-        <Button variant="secondary" fullWidth icon={<GoogleIcon />} onClick={onLogin}>Continuar con Google</Button>
-
-        <p style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", marginTop: 20 }}>
-          ¿No tienes cuenta? <span onClick={onRegister} style={{ color: "var(--ff-red-light)", fontWeight: 600, cursor: onRegister ? "pointer" : "default" }}>Regístrate</span>
-        </p>
+        <LoginLinkRow onRegister={onRegister} tone="dark" />
       </div>
     </div>
   );
 }
 
-window.LoginScreen = LoginScreen;
 
-// ── Register.jsx ────────────────────────────────────────────────
-// FitFighters mobile — Registration form.
-
-function RegisterScreen({ onBack, onRegister }) {
-  const [name, setName] = React.useState("");
-  const [lastName, setLastName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [pwd, setPwd] = React.useState("");
-  const [confirm, setConfirm] = React.useState("");
-
-  const mismatch = confirm.length > 0 && pwd !== confirm;
-  const canSubmit = name.length > 0 && email.length > 3 && pwd.length >= 8 && pwd === confirm;
-
+// Campo blanco tipo "filled" de Material: 56px de alto, el label vive dentro de la
+// superficie blanca y se eleva al escribir. Sin borde; el foco se marca en verde.
+function WhiteField({ label, value, onChange, password, type = "text", supportingText, error }) {
+  const [focused, setFocused] = React.useState(false);
+  const [reveal, setReveal] = React.useState(false);
+  const floated = focused || (value != null && String(value).length > 0);
+  const accent = error ? "var(--ff-error)" : focused ? "var(--ff-green)" : null;
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Registro">
-      <AppBar variant="title" title="Crear cuenta" showBack onBack={onBack} />
+    <div>
+      <div style={{ position: "relative", height: 56, borderRadius: 8, background: "#FFFFFF", padding: "0 14px", display: "flex", alignItems: "flex-end", boxShadow: accent ? `inset 0 -2px 0 ${accent}` : "none" }}>
+        <span style={{ position: "absolute", left: 14, top: floated ? 8 : "50%", transform: floated ? "none" : "translateY(-50%)", fontFamily: "var(--font-body)", fontSize: floated ? 11 : 15, color: error ? "var(--ff-error)" : focused ? "var(--ff-green)" : "var(--ff-text-3)", pointerEvents: "none", transition: "all .15s ease" }}>{label}</span>
+        <input
+          value={value}
+          type={password && !reveal ? "password" : type}
+          onChange={(e) => onChange && onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 15, height: 32, padding: 0, marginBottom: 6 }}
+        />
+        {password && (
+          <button type="button" onClick={() => setReveal(r => !r)} aria-label={reveal ? "Ocultar" : "Mostrar"} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, marginBottom: 4, display: "flex", opacity: 0.6 }}>
+            <span style={{ width: 20, height: 20, display: "block", background: "var(--ff-text-2)", WebkitMaskImage: `url(${window.__resources?.[reveal ? "visibilityOff" : "visibilityOn"] || `assets/icons/${reveal ? "visibility_off" : "visibility_on"}.svg`})`, maskImage: `url(${window.__resources?.[reveal ? "visibilityOff" : "visibilityOn"] || `assets/icons/${reveal ? "visibility_off" : "visibility_on"}.svg`})`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }} />
+          </button>
+        )}
+      </div>
+      {supportingText ? (
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: error ? "var(--ff-error)" : "var(--ff-text-3)", margin: "6px 14px 0" }}>{supportingText}</p>
+      ) : null}
+    </div>
+  );
+}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 130px" }}>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-3)", lineHeight: 1.6, margin: "8px 0 20px" }}>
-          Crea tu cuenta para empezar a entrenar con propósito.
-        </p>
+// App bar claro con la marca centrada.
+function BrandAppBar({ onBack }) {
+  return (
+    <header style={{ position: "relative", display: "flex", alignItems: "center", height: 56, padding: "0 6px", flexShrink: 0, background: "transparent" }}>
+      <CircleIconBtn kind="back" onClick={onBack} />
+    </header>
+  );
+}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <TextField label="Nombre" value={name} onChange={setName} />
-            <TextField label="Apellido" value={lastName} onChange={setLastName} />
-          </div>
-          <TextField label="Correo electrónico" value={email} onChange={setEmail} type="email" />
-          <TextField label="Contraseña" value={pwd} onChange={setPwd} password supportingText="Mínimo 8 caracteres" />
-          <TextField
-            label="Confirmar contraseña"
-            value={confirm}
-            onChange={setConfirm}
-            password
-            error={mismatch}
-            supportingText={mismatch ? "Las contraseñas no coinciden" : ""}
-          />
+function LoginEmailScreen({ onLogin, onBack, onRegister }) {
+  const [email, setEmail] = React.useState("eduardo@gmail.com");
+  const [pwd, setPwd] = React.useState("FitFighters1");
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Login D · correo">
+      <BrandAppBar onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 20px 24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "0 0 8px" }}>Ingresar con correo</h1>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>Usa el correo con el que creaste tu cuenta.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <WhiteField label="Correo electrónico" value={email} onChange={setEmail} type="email" />
+          <WhiteField label="Contraseña" value={pwd} onChange={setPwd} password />
         </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, color: "var(--ff-red-light)", cursor: "pointer" }}>Olvidé mi contraseña</span>
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: "12px 20px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" fullWidth onClick={onLogin}>Iniciar sesión</Button>
+        <LoginLinkRow onRegister={onRegister} />
+      </div>
+    </div>
+  );
+}
 
+// Registro · misma identidad clara que el resto del flujo tras la portada.
+function RegisterScreen({ onBack, onRegister }) {
+  const [name, setName] = React.useState("Eduardo");
+  const [lastName, setLastName] = React.useState("Ramírez");
+  const [email, setEmail] = React.useState("eduardo@gmail.com");
+  const [pwd, setPwd] = React.useState("FitFighters1");
+  const [confirm, setConfirm] = React.useState("FitFighters1");
+  const mismatch = confirm.length > 0 && pwd !== confirm;
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Registro">
+      <BrandAppBar onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 20px 24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "0 0 8px" }}>Crear cuenta</h1>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>Dos minutos y empiezas a entrenar.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <WhiteField label="Nombre(s)" value={name} onChange={setName} />
+          <WhiteField label="Apellido(s)" value={lastName} onChange={setLastName} />
+          <WhiteField label="Correo electrónico" value={email} onChange={setEmail} type="email" />
+          <WhiteField label="Contraseña" value={pwd} onChange={setPwd} password supportingText="Mínimo 8 caracteres" />
+          <WhiteField label="Confirmar contraseña" value={confirm} onChange={setConfirm} password error={mismatch} supportingText={mismatch ? "Las contraseñas no coinciden" : ""} />
+        </div>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", lineHeight: 1.6, margin: "18px 2px 0" }}>
           Al crear tu cuenta aceptas los <strong style={{ color: "var(--ff-text-2)", fontWeight: 500 }}>Términos</strong> y el <strong style={{ color: "var(--ff-text-2)", fontWeight: 500 }}>Aviso de privacidad</strong> de FitFighters.
         </p>
       </div>
-
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "16px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
-        <Button variant="primary" disabled={!canSubmit} onClick={onRegister}>Crear cuenta</Button>
+      <div style={{ flexShrink: 0, padding: "12px 20px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" fullWidth onClick={onRegister}>Crear cuenta</Button>
       </div>
     </div>
   );
 }
 
+
+window.LoginScreen = LoginChoiceScreen;
+window.LoginEmailScreen = LoginEmailScreen;
 window.RegisterScreen = RegisterScreen;
 
 // ── Onboarding.jsx ───────────────────────────────────────────────
@@ -200,189 +273,206 @@ function OnboardingStepShell({ children }) {
   );
 }
 
-function OnboardingScreen({ onBack, onComplete, initialStep = 0, initialExperienceLevel = null, initialHeight = "", initialWeight = "", initialUnitSystem = "metric" }) {
-  const [step, setStep] = React.useState(initialStep);
-  const [gender, setGender] = React.useState(null);
-  const [birthdate, setBirthdate] = React.useState("");
-  const [unitSystem, setUnitSystem] = React.useState(initialUnitSystem);
-  const [height, setHeight] = React.useState(initialHeight);
-  const [weight, setWeight] = React.useState(initialWeight);
-  const ranges = MEASUREMENT_RANGES[unitSystem];
-  const invalidHeightRange = outOfRange(height, ranges.height);
-  const invalidWeightRange = outOfRange(weight, ranges.weight);
-  const [experienceLevel, setExperienceLevel] = React.useState(initialExperienceLevel);
-  const [muscleGroups, setMuscleGroups] = React.useState(new Set());
-  const [goal, setGoal] = React.useState(null);
-  const [place, setPlace] = React.useState(null);
-  const [days, setDays] = React.useState(new Set());
+// ── O2 · Onboarding aprobado con la paleta clara ─────────────────
+// Misma estructura, mismos pasos y mismos controles que el onboarding aprobado: lo único
+// que cambia es la paleta (tarjetas blancas sobre fondo claro, rojo como único acento) y
+// el respiro del paso de datos personales, donde género y sistema de unidades venían
+// pegados uno debajo del otro.
+const O2_SHEET = { ...APP_LIGHT_BG, ...APP_LIGHT };
 
-  const needsMuscleGroup = experienceLevel === "advanced";
-  // Logical step order, skipping muscle-group unless advanced.
-  const stepOrder = needsMuscleGroup
-    ? ["personal", "experience", "muscle", "objective", "place", "days"]
-    : ["personal", "experience", "objective", "place", "days"];
-  const stepKey = stepOrder[step];
-  const isLast = step === stepOrder.length - 1;
+const O2_LEVELS = [
+  { value: "beginner", description: "Estoy comenzando." },
+  { value: "intermediate", description: "Llevo menos de 2 años entrenando de forma regular." },
+  { value: "advanced", description: "Llevo más de 2 años entrenando de forma regular." },
+];
+const O2_MUSCLES = ["Cuerpo entero", "Glúteos", "Piernas", "Espalda", "Pecho", "Brazos", "Hombros", "Abdomen"];
+const O2_GOALS = ["Bajar de peso / Perder grasa", "Definir / Tonificar", "Ganar músculo", "Mejorar mi salud"];
+const O2_UNITS = [{ value: "metric", label: "Métrico (kg, cm)" }, { value: "imperial", label: "Inglés (lb, in)" }];
+const O2_PLACES = ["Gimnasio", "Casa"];
+const O2_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-  const toggleSet = (setFn, set, value) => {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value); else next.add(value);
-    setFn(next);
-  };
+function O2LevelCard({ description, selected, onClick }) {
+  return (
+    <button onClick={onClick} style={{ width: "100%", textAlign: "left", padding: "16px 18px", borderRadius: 14, cursor: "pointer", background: "var(--ff-surface)",
+      border: selected ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.45,
+      color: selected ? "var(--ff-red-light)" : "var(--ff-text)" }}>{description}</button>
+  );
+}
 
-  const stepValid = (() => {
-    switch (stepKey) {
-      case "personal": return !!gender && birthdate.length > 0 && height.length > 0 && weight.length > 0 && !invalidHeightRange && !invalidWeightRange;
-      case "experience": return !!experienceLevel;
-      case "muscle": return muscleGroups.size > 0;
-      case "objective": return !!goal;
-      case "place": return !!place;
-      case "days": return days.size >= 3 && days.size <= 6;
-      default: return false;
-    }
-  })();
+// El onboarding usa el mismo campo del login y el registro.
+function O2Field(props) {
+  return <WhiteField {...props} />;
+}
 
-  const goNext = () => {
-    if (isLast) { onComplete && onComplete(); return; }
-    setStep(s => s + 1);
-  };
-  const goBack = () => {
-    if (step === 0) { onBack && onBack(); return; }
-    setStep(s => s - 1);
-  };
+// Una sola manera de mostrar la selección en todo el onboarding: borde y letra en rojo.
+function O2Choice({ children, selected, onClick, height = 52 }) {
+  return (
+    <button onClick={onClick} style={{ width: "100%", minHeight: height, padding: "12px 16px", borderRadius: 14, cursor: "pointer", background: "#FFFFFF",
+      border: selected ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", fontFamily: "var(--font-body)", fontSize: 14, fontWeight: selected ? 600 : 500, lineHeight: 1.4,
+      color: selected ? "var(--ff-red-light)" : "var(--ff-text)" }}>{children}</button>
+  );
+}
 
-  let content;
-  if (stepKey === "personal") {
+// Filtro de planes con la misma convención de selección que el onboarding.
+function PlanFilterChip({ children, selected, onClick }) {
+  return (
+    <button onClick={onClick} style={{ height: 38, padding: "0 16px", borderRadius: 14, cursor: "pointer", background: "#FFFFFF",
+      border: selected ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: selected ? 600 : 500,
+      color: selected ? "var(--ff-red-light)" : "var(--ff-text)" }}>{children}</button>
+  );
+}
+
+function O2Shell({ children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 16px 0" }}>
+      <img src={window.__resources?.ffMark || "assets/logos/ff_mark.svg"} style={{ width: 56, height: 56, marginBottom: 8 }} alt="" />
+      {children}
+    </div>
+  );
+}
+
+function O2Onboarding({ step = 0, level = "advanced", seedPlace = "Gimnasio", seedHeight = "178", seedWeight = "82", onBack, onComplete }) {
+  const [sIdx, setSIdx] = React.useState(step);
+  const [gender, setGender] = React.useState("M");
+  const [birth, setBirth] = React.useState("1994-06-12");
+  const [unit, setUnit] = React.useState("metric");
+  const [height, setHeight] = React.useState(seedHeight);
+  const [weight, setWeight] = React.useState(seedWeight);
+  const [exp, setExp] = React.useState(level);
+  const [muscles, setMuscles] = React.useState(["Glúteos", "Espalda"]);
+  const [goal, setGoal] = React.useState("Definir / Tonificar");
+  const [place, setPlace] = React.useState(seedPlace);
+  const [days, setDays] = React.useState(["Lunes", "Martes", "Jueves", "Viernes"]);
+
+  const order = exp === "advanced"
+    ? ["personal", "measures", "experience", "muscle", "objective", "place", "days"]
+    : ["personal", "measures", "experience", "objective", "place", "days"];
+  const key = order[Math.min(sIdx, order.length - 1)];
+  const isLast = key === "days";
+  const toggle = (list, set, v) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  const ranges = MEASUREMENT_RANGES[unit];
+  const badHeight = outOfRange(height, ranges.height);
+  const badWeight = outOfRange(weight, ranges.weight);
+  const valid = key === "days" ? days.length >= 3 && days.length <= 6
+    : key === "muscle" ? muscles.length > 0
+    : key === "personal" ? !!gender && birth.length > 0
+    : key === "measures" ? height.length > 0 && weight.length > 0 && !badHeight && !badWeight
+    : true;
+
+  const eyebrow = { fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" };
+  const h1 = { fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 4px" };
+  const sub = { fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center" };
+
+  let content = null;
+  if (key === "personal") {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 24px" }}>Datos personales</h1>
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 14 }}>
+      <O2Shell>
+        <h1 style={{ ...h1, margin: "8px 0 26px" }}>Datos personales</h1>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 26 }}>
+          <O2Field label="Fecha de nacimiento" type="date" value={birth} onChange={setBirth} supportingText="Edad mínima: 14 años." />
           <div>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 8px" }}>Género</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Chip selected={gender === "M"} onClick={() => setGender("M")} style={{ flex: 1 }}>Hombre</Chip>
-              <Chip selected={gender === "F"} onClick={() => setGender("F")} style={{ flex: 1 }}>Mujer</Chip>
+            <p style={eyebrow}>Género</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <O2Choice selected={gender === "M"} onClick={() => setGender("M")}>Hombre</O2Choice>
+              <O2Choice selected={gender === "F"} onClick={() => setGender("F")}>Mujer</O2Choice>
             </div>
           </div>
-          <div>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".04em", color: "var(--ff-text-2)", margin: "0 0 6px", paddingLeft: 2 }}>Fecha de nacimiento</p>
-            <div style={{ position: "relative", border: "1px solid var(--ff-border)", borderRadius: "var(--radius-lg)", padding: "0 14px", height: 56, display: "flex", alignItems: "center" }}>
-              <input
-                type="date"
-                value={birthdate}
-                onChange={(e) => setBirthdate(e.target.value)}
-                style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 15, height: "100%", width: "100%", colorScheme: "dark" }}
-              />
-            </div>
-            <p style={{ margin: "6px 2px 0", fontSize: 11, color: "var(--ff-text-3)" }}>Edad mínima: 14 años.</p>
+        </div>
+      </O2Shell>
+    );
+  } else if (key === "measures") {
+    content = (
+      <O2Shell>
+        <h1 style={{ ...h1, margin: "8px 0 26px" }}>Medidas</h1>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 26 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <O2Field label={unit === "metric" ? "Altura (cm)" : "Altura (in)"} type="number" value={height} onChange={setHeight}
+              error={!!badHeight} supportingText={badHeight ? `Ingresa una estatura entre ${badHeight.min} y ${badHeight.max} ${badHeight.unit}.` : ""} />
+            <O2Field label={unit === "metric" ? "Peso (kg)" : "Peso (lb)"} type="number" value={weight} onChange={setWeight}
+              error={!!badWeight} supportingText={badWeight ? `Ingresa un peso entre ${badWeight.min} y ${badWeight.max} ${badWeight.unit}.` : ""} />
           </div>
           <div>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 8px" }}>Sistema de unidades</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              {UNIT_SYSTEMS.map(u => (
-                <Chip key={u.value} selected={unitSystem === u.value} onClick={() => setUnitSystem(u.value)} style={{ flex: 1 }}>{u.label}</Chip>
+            <p style={eyebrow}>Sistema de unidades</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              {O2_UNITS.map((u) => (
+                <O2Choice key={u.value} selected={unit === u.value} onClick={() => setUnit(u.value)}>{u.label}</O2Choice>
               ))}
             </div>
           </div>
-          <TextField
-            label={unitSystem === "metric" ? "Altura (cm)" : "Altura (in)"}
-            type="number"
-            value={height}
-            onChange={setHeight}
-            error={!!invalidHeightRange}
-            supportingText={invalidHeightRange ? `Ingresa una estatura entre ${invalidHeightRange.min} y ${invalidHeightRange.max} ${invalidHeightRange.unit}.` : ""}
-          />
-          <TextField
-            label={unitSystem === "metric" ? "Peso (kg)" : "Peso (lb)"}
-            type="number"
-            value={weight}
-            onChange={setWeight}
-            error={!!invalidWeightRange}
-            supportingText={invalidWeightRange ? `Ingresa un peso entre ${invalidWeightRange.min} y ${invalidWeightRange.max} ${invalidWeightRange.unit}.` : ""}
-          />
         </div>
-      </OnboardingStepShell>
+      </O2Shell>
     );
-  } else if (stepKey === "experience") {
+  } else if (key === "experience") {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 4px" }}>Nivel de experiencia</h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center" }}>¿Actualmente estás entrenando de forma regular?</p>
+      <O2Shell>
+        <h1 style={h1}>Nivel de experiencia</h1>
+        <p style={sub}>¿Actualmente estás entrenando de forma regular?</p>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-          {EXPERIENCE_LEVELS.map(lvl => (
-            <ExperienceLevelOptionCard key={lvl.value} description={lvl.description} selected={experienceLevel === lvl.value} onClick={() => setExperienceLevel(lvl.value)} />
-          ))}
+          {O2_LEVELS.map((l) => <O2LevelCard key={l.value} description={l.description} selected={exp === l.value} onClick={() => setExp(l.value)} />)}
         </div>
-      </OnboardingStepShell>
+      </O2Shell>
     );
-  } else if (stepKey === "muscle") {
+  } else if (key === "muscle") {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 12px" }}>Grupos musculares</h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center", lineHeight: 1.5 }}>Se recomienda elegir un grupo muscular de la parte inferior y uno de la parte superior del cuerpo</p>
+      <O2Shell>
+        <h1 style={{ ...h1, margin: "8px 0 12px" }}>Grupos musculares</h1>
+        <p style={{ ...sub, fontSize: 13, lineHeight: 1.5 }}>Se recomienda elegir un grupo muscular de la parte inferior y uno de la parte superior del cuerpo</p>
         <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {MUSCLE_GROUPS.map(mg => (
-            <Chip key={mg.value} selected={muscleGroups.has(mg.value)} onClick={() => toggleSet(setMuscleGroups, muscleGroups, mg.value)}>{mg.label}</Chip>
-          ))}
+          {O2_MUSCLES.map((m) => <O2Choice key={m} selected={muscles.includes(m)} onClick={() => toggle(muscles, setMuscles, m)}>{m}</O2Choice>)}
         </div>
-      </OnboardingStepShell>
+      </O2Shell>
     );
-  } else if (stepKey === "objective") {
+  } else if (key === "objective") {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 4px" }}>Objetivo</h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center" }}>¿Cuál es tu objetivo principal?</p>
+      <O2Shell>
+        <h1 style={h1}>Objetivo</h1>
+        <p style={sub}>¿Cuál es tu objetivo principal?</p>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-          {FITNESS_GOALS.map(g => (
-            <Chip key={g.value} selected={goal === g.value} onClick={() => setGoal(g.value)} style={{ width: "100%" }}>{g.label}</Chip>
-          ))}
+          {O2_GOALS.map((g) => <O2Choice key={g} selected={goal === g} onClick={() => setGoal(g)}>{g}</O2Choice>)}
         </div>
-      </OnboardingStepShell>
+      </O2Shell>
     );
-  } else if (stepKey === "place") {
+  } else if (key === "place") {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 4px" }}>Lugar de entrenamiento</h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 20px", textAlign: "center" }}>¿En qué lugar entrenarás principalmente?</p>
+      <O2Shell>
+        <h1 style={h1}>Lugar de entrenamiento</h1>
+        <p style={sub}>¿En qué lugar entrenarás principalmente?</p>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
-          {TRAINING_PLACES.map(p => (
-            <Chip key={p.value} selected={place === p.value} onClick={() => setPlace(p.value)} style={{ width: "100%" }}>{p.label}</Chip>
-          ))}
+          {O2_PLACES.map((p) => <O2Choice key={p} selected={place === p} onClick={() => setPlace(p)}>{p}</O2Choice>)}
         </div>
-        {place === "home" ? (
+        {place === "Casa" && (
           <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: "16px 0 0", textAlign: "center", lineHeight: 1.4 }}>Para entrenar en casa necesitas por lo menos un par de mancuernas</p>
-        ) : null}
-      </OnboardingStepShell>
+        )}
+      </O2Shell>
     );
   } else {
     content = (
-      <OnboardingStepShell>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: "8px 0 4px" }}>Días de entrenamiento</h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: "0 0 4px", textAlign: "center" }}>Selecciona los días que vas a entrenar</p>
+      <O2Shell>
+        <h1 style={h1}>Días de entrenamiento</h1>
+        <p style={{ ...sub, margin: "0 0 4px" }}>Selecciona los días que vas a entrenar</p>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "0 0 20px", textAlign: "center" }}>(Mínimo 3 días. Máximo 6 días)</p>
         <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {TRAINING_DAYS.map(d => (
-            <Chip key={d.value} selected={days.has(d.value)} onClick={() => toggleSet(setDays, days, d.value)}>{d.label}</Chip>
-          ))}
+          {O2_WEEK.map((d) => <O2Choice key={d} selected={days.includes(d)} onClick={() => toggle(days, setDays, d)}>{d}</O2Choice>)}
         </div>
-      </OnboardingStepShell>
+      </O2Shell>
     );
   }
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Onboarding">
-      <AppBar variant="title" title="" showBack={step > 0} onBack={goBack} />
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 0 110px" }}>
-        {content}
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...O2_SHEET }} data-screen-label={"Onboarding O2 · " + key}>
+      <div style={{ display: "flex", alignItems: "center", height: 56, padding: "0 6px", flexShrink: 0 }}>
+        <CircleIconBtn kind="back" onClick={() => (sIdx === 0 ? onBack && onBack() : setSIdx((n) => n - 1))} />
       </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 0 110px" }}>{content}</div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
-        <Button variant="primary" disabled={!stepValid} onClick={goNext}>{isLast ? "Finalizar" : "Siguiente"}</Button>
+        <Button variant="primary" fullWidth disabled={!valid} onClick={() => (isLast ? onComplete && onComplete() : setSIdx((n) => Math.min(order.length - 1, n + 1)))}>{isLast ? "Finalizar" : "Siguiente"}</Button>
       </div>
     </div>
   );
 }
 
-window.OnboardingScreen = OnboardingScreen;
+window.OnboardingScreen = O2Onboarding;
+window.O2Onboarding = O2Onboarding;
 
 // ── RecommendedProgram.jsx ───────────────────────────────────────
 // FitFighters mobile — Post-onboarding recommended program (SelectedProgramScreen, ONBOARDING mode).
@@ -390,10 +480,10 @@ window.OnboardingScreen = OnboardingScreen;
 function RecommendedProgramScreen({ onContinue }) {
   const p = window.FF_DATA.recommendedProgram || { name: "Programa recomendado", description: "" };
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Programa recomendado">
-      <div style={{ width: "100%", height: 200, flexShrink: 0, position: "relative", background: "linear-gradient(135deg,#1a1010 0%,#161018 60%,#101014 100%)" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Programa recomendado">
+      <div style={{ width: "100%", height: 200, flexShrink: 0, position: "relative", background: "linear-gradient(135deg, rgba(255,50,0,.12) 0%, rgba(255,154,60,.08) 60%, rgba(46,207,122,.07) 100%)" }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.6"><circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" fill="rgba(255,255,255,0.35)" stroke="none" /></svg>
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="rgba(20,20,20,0.3)" strokeWidth="1.6"><circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" fill="rgba(20,20,20,0.3)" stroke="none" /></svg>
         </div>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 60%, var(--ff-bg) 100%)" }} />
       </div>
@@ -756,9 +846,10 @@ function TutorialScreen({ tab, onTab }) {
 
 // FitFighters mobile — Work-in-progress placeholder for sections not built yet.
 function WipScreen({ title = "Próximamente", onBack }) {
+  const [scrolled] = useBarScroll();
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="En construcción">
-      <AppBar variant="title" title={title} showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="En construcción">
+      <FloatingTopBar title={title} onBack={onBack} scrolled={scrolled} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px 80px", textAlign: "center", gap: 20 }}>
         <div style={{ width: 72, height: 72, borderRadius: 18, background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -998,48 +1089,503 @@ function WorkoutScreen({ onSelectDay, tab, onTab, bannerVariant = null }) {
 
 window.WorkoutScreen = WorkoutScreen;
 
+// ── WorkoutList.jsx (v2) ────────────────────────────────────────
+// Workout aprobado (W5, 19 ago 2026): header del programa sin calendario, fila de
+// "Rutinas anteriores", card grande de hoy y lista de las próximas rutinas.
+// Incluye la vista aparte de rutinas anteriores (filtro completadas/pendientes),
+// el empty state sin plan y las dos hojas de tutorial.
+
+const WORKOUT_HERO = "https://d3gfgejixr95u4.cloudfront.net/app/production/routines/1691718103462.jpg";
+
+// Glifos reales de la app enmascarados a color (mismo patrón que BottomNav / TextField).
+function MaskIcon({ name, resKey, size = 20, color = "#fff", src }) {
+  const url = src || window.__resources?.[resKey] || `assets/icons/${name}.svg`;
+  return <span style={{ width: size, height: size, display: "block", background: color, WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" }} />;
+}
+
+// Encabezado del programa sin imagen: la foto se reserva para la rutina.
+function ProgramHeaderFlat() {
+  const p = window.FF_DATA.program;
+  return (
+    <div style={{ padding: "0 18px 16px" }}>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>{p.generation}</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 21, color: "var(--ff-text)", lineHeight: 1.2, letterSpacing: "-.4px", margin: 0 }}>{p.name}</h1>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-red-light)", background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap", flexShrink: 0 }}>Nivel {p.level}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "16px 0 8px" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)" }}>Semana {p.week} de {p.totalWeeks}</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text)" }}>{p.userProgress}% de tu plan</span>
+      </div>
+      <DualProgressBar user={p.userProgress} plan={p.planProgress} />
+    </div>
+  );
+}
+
+function InitialsAvatar({ name = "Emmanuel Navarro", size = 40 }) {
+  const initials = name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  return (
+    <button aria-label={"Perfil de " + name} style={{ width: size, height: size, borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{initials}</button>
+  );
+}
+
+// Barra inferior blanca con el mismo difuminado que los footers de CTA:
+// el contenido se desvanece bajo la barra en vez de cortarse con una línea.
+function TwoTabBar({ active = "workout", onChange }) {
+  const pill = "var(--ff-red)";
+  const label = "var(--ff-red)";
+  const tabs = [
+    { id: "workout", label: "Workout", icon: "ic_workout", res: "icWorkout" },
+    { id: "chat", label: "Chat", icon: "ic_chat", res: "icChat" },
+  ];
+  return (
+    <nav style={{ display: "flex", flexShrink: 0, paddingTop: 28, paddingBottom: 8, marginTop: -28, position: "relative", zIndex: 2, background: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 62%, rgba(255,255,255,0) 100%)" }}>
+      {tabs.map((t) => {
+        const sel = active === t.id;
+        return (
+          <button key={t.id} onClick={() => onChange && onChange(t.id)} style={{ flex: 1, height: 64, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, background: "none", border: "none", cursor: "pointer" }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 28, padding: "0 20px", borderRadius: 999, background: sel ? pill : "transparent" }}>
+              <MaskIcon name={t.icon + (sel ? "_filled" : "_outlined")} resKey={t.res + (sel ? "Filled" : "Outlined")} size={20} color={sel ? "#fff" : "var(--ff-text-3)"} />
+            </span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: sel ? 700 : 500, color: sel ? label : "var(--ff-text-3)" }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function PendingRow({ onOpen }) {
+  return (
+    <button onClick={onOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
+      <span style={{ width: 34, height: 34, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red-light)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)" }}>Rutinas anteriores</span>
+        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>Completadas y pendientes de tu plan</span>
+      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+    </button>
+  );
+}
+
+function RoutineListItem({ item, mins, blocks, onOpen }) {
+  const p = window.FF_DATA.program;
+  return (
+    <div onClick={onOpen} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, cursor: "pointer" }}>
+      <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ width: 66, height: 66, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>{item.day} · {item.date}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.routine}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>{mins} min · {blocks} bloques</p>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: 4 }}><polyline points="9 18 15 12 9 6" /></svg>
+    </div>
+  );
+}
+
+// Vista aparte "Rutinas anteriores": un filtro entre pendientes y completadas.
+// El progreso de una rutina no se guarda: solo se marca hecha o pendiente.
+function PastRoutinesScreen({ onBack, onSelectDay }) {
+  const p = window.FF_DATA.program;
+  const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter(b => b.type !== "rest").length;
+  const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
+  const template = (window.FF_DATA.weekTemplate || []).filter(x => x.type !== "rest");
+  const [filter, setFilter] = React.useState("done");
+  // Cada rutina anterior guarda la semana del plan a la que pertenece.
+  const past = (offsets) => offsets.map((off, i) => {
+    const item = template[i % template.length];
+    return { ...item, date: formatShortDate(p.weekStartDate, off), week: p.week + Math.floor(off / 7) };
+  });
+  const pending = past([-9, -6, -2]);
+  const done = past([-14, -12, -9, -5, -3]);
+  const list = filter === "pending" ? pending : done;
+  // Agrupadas por semana, de la más reciente a la más antigua.
+  const groups = [];
+  list.slice().sort((a, b) => b.week - a.week).forEach((item) => {
+    const g = groups.find(x => x.week === item.week);
+    if (g) g.items.push(item); else groups.push({ week: item.week, items: [item] });
+  });
+  const chip = (id, label) => (
+    <button key={id} onClick={() => setFilter(id)} style={{ flex: 1, height: 36, borderRadius: 999, cursor: "pointer", border: "1px solid", borderColor: filter === id ? "rgba(255,50,0,.25)" : "var(--ff-border)", background: filter === id ? "var(--ff-primary-container)" : "var(--ff-surface)", color: filter === id ? "var(--ff-red-light)" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>{label}</button>
+  );
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Rutinas anteriores">
+      <header style={{ display: "flex", alignItems: "center", gap: 4, height: 56, padding: "0 6px", flexShrink: 0 }}>
+        <CircleIconBtn kind="back" onClick={onBack} />
+      </header>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 16px 24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 21, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "0 0 16px" }}>Rutinas anteriores</h1>
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {chip("done", "Completadas")}
+          {chip("pending", "Pendientes")}
+        </div>
+        {filter === "pending" ? (
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "rgba(46,207,122,0.10)", border: "1px solid rgba(46,207,122,0.30)", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.6, margin: 0 }}>No importa si te saltaste algunos días. Lo que construye resultados es la constancia, no la perfección: haz la que sigue y continúa tu plan.</p>
+          </div>
+        ) : (
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 0 18px", maxWidth: 320 }}>Todo esto ya lo hiciste. Cada rutina completada es constancia acumulada.</p>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {groups.map((g) => (
+          <div key={g.week} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 2px" }}>Semana {g.week}</p>
+            {g.items.map((item, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14 }}>
+              <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ width: 66, height: 66, borderRadius: 10, objectFit: "cover", flexShrink: 0, filter: filter === "done" ? "saturate(0.85)" : "saturate(0.6)" }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>{item.day} · {item.date}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.routine}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>{mins} min · {blockCount} bloques</p>
+              </div>
+              {filter === "pending" ? (
+                <button onClick={() => onSelectDay && onSelectDay(item)} style={{ flexShrink: 0, height: 36, padding: "0 14px", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Hacer rutina</button>
+              ) : (
+                <span style={{ flexShrink: 0, width: 28, height: 28, marginRight: 4, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(46,207,122,0.12)" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
+              )}
+            </div>
+            ))}
+          </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Bottom sheet de semanas: la actual y las siguientes; las pasadas quedan atenuadas.
+function WeekSheet({ p, value, onPick, onClose }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 0 22px", maxHeight: "70%", overflowY: "auto" }}>
+        <div style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)", margin: "0 auto 14px" }} />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 20px 4px" }}>Ver otra semana</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12.5, color: "var(--ff-text-2)", margin: "0 20px 12px" }}>Te quedan {p.totalWeeks - p.week + 1} semanas de tu plan.</p>
+        {Array.from({ length: p.totalWeeks - p.week + 1 }, (_, i) => p.week + i).map((w) => {
+          const sel = w === value;
+          return (
+            <button key={w} onClick={() => onPick(w)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", background: sel ? "var(--ff-primary-container)" : "transparent", border: "none", borderTop: "1px solid var(--ff-border)", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: sel ? "var(--ff-red-light)" : "var(--ff-text)" }}>Semana {w}</span>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>{w === p.week ? "Semana actual" : "Próxima"}</span>
+              </span>
+              {sel && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red-light)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeekPill({ week, onClick }) {
+  return (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+      Semana {week}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+    </button>
+  );
+}
+
+function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
+  const p = window.FF_DATA.program;
+  const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter(b => b.type !== "rest").length;
+  const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
+  const template = window.FF_DATA.weekTemplate || [];
+  const todayIdx = Math.max(0, template.findIndex(x => x.status === "today"));
+  // Solo las rutinas por realizar, de hoy en adelante, con su fecha real.
+  const upcoming = [];
+  for (let offset = todayRest ? 1 : 0; upcoming.length < 6 && offset < 21; offset++) {
+    const i = todayIdx + offset;
+    const item = template[i % template.length];
+    if (item.type === "rest") continue;
+    upcoming.push({ ...item, date: formatShortDate(p.weekStartDate, i), status: offset === 0 ? "today" : "upcoming" });
+  }
+  const first = upcoming[0];
+  const rest = todayRest ? upcoming : upcoming.slice(1);
+  const todayDate = formatShortDate(p.weekStartDate, todayIdx);
+  const todayName = (template[todayIdx] || {}).day;
+  const [week, setWeek] = React.useState(initialWeek || p.week);
+  const [sheet, setSheet] = React.useState(!!sheetOpen);
+  const isCurrent = week === p.week;
+  // Semana distinta a la actual: la lista son sus días de entrenamiento, sin card de hoy.
+  const weekRoutines = template
+    .map((item, i) => ({ ...item, date: formatShortDate(p.weekStartDate, (week - p.week) * 7 + i) }))
+    .filter(x => x.type !== "rest");
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Workout W5">
+      <header style={{ display: "flex", alignItems: "center", height: 56, padding: "0 16px", flexShrink: 0 }}>
+        <InitialsAvatar />
+      </header>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 20px" }}>
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "16px 0 18px", marginBottom: 12 }}>
+          <ProgramHeaderFlat />
+        </div>
+        <div style={{ marginBottom: 18 }}>
+          <PendingRow onOpen={() => {}} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 2px 10px" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0 }}>{isCurrent ? "Hoy" : "Próximas rutinas"}</p>
+          <WeekPill week={week} onClick={() => setSheet(true)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {!isCurrent ? (
+            <React.Fragment>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 2px 2px" }}>Estás viendo una semana distinta a la actual.</p>
+              {weekRoutines.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
+              <button onClick={() => setWeek(p.week)} style={{ marginTop: 4, height: 44, borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Volver a la semana actual</button>
+            </React.Fragment>
+          ) : todayRest ? (
+            <div style={{ position: "relative", minHeight: 200, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <img src="assets/rest.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.55)" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.50) 45%, rgba(0,0,0,0.85) 100%)" }} />
+              <div style={{ position: "relative", padding: "20px 18px 18px" }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>Hoy · {todayName} {todayDate}</p>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", letterSpacing: "-.3px", margin: "0 0 8px" }}>Día de descanso</h2>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.80)", lineHeight: 1.6, margin: 0, maxWidth: 260 }}>Recúpera bien: el descanso es parte del entrenamiento.</p>
+              </div>
+            </div>
+          ) : (
+          <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+            <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 100%)" }} />
+            <div style={{ position: "relative", padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>Hoy · {first.day} {first.date}</p>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", letterSpacing: "-.3px", lineHeight: 1.2, margin: "0 0 8px" }}>{first.routine}</h2>
+                <div style={{ display: "flex", gap: 14 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 12.5, color: "rgba(255,255,255,0.80)" }}>{mins} min aprox.</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 12.5, color: "rgba(255,255,255,0.80)" }}>{blockCount} bloques</span>
+                </div>
+              </div>
+              <button onClick={() => onSelectDay && onSelectDay(first)} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "#FFFFFF", color: "#101010", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer" }}>Ver rutina</button>
+            </div>
+          </div>
+          )}
+          {isCurrent && <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "8px 2px 0" }}>Tus próximas rutinas</p>}
+          {isCurrent && rest.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
+        </div>
+      </div>
+      <TwoTabBar active="workout" tone="dark" onChange={() => {}} />
+      {sheet && <WeekSheet p={p} value={week} onPick={(w) => { setWeek(w); setSheet(false); }} onClose={() => setSheet(false)} />}
+    </div>
+  );
+}
+
+// W5 · sin plan cargado: el workout queda callado, solo una card blanca lo explica.
+function WorkoutEmptyScreen({ onStartTutorial }) {
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Workout W5 · sin plan">
+      <header style={{ display: "flex", alignItems: "center", height: 56, padding: "0 16px", flexShrink: 0 }}>
+        <InitialsAvatar />
+      </header>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 16px 40px" }}>
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "30px 20px", textAlign: "center" }}>
+          <span style={{ width: 72, height: 72, borderRadius: 20, margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
+            <img src={window.__resources?.ffMark || "assets/logos/ff_mark.svg"} alt="" style={{ width: 36 }} />
+          </span>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", lineHeight: 1.3, letterSpacing: "-.3px", margin: "0 0 8px" }}>Bienvenido a FitFighters</h1>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 auto", maxWidth: 240 }}>Cuando tengas un plan activo aparecerá aquí.</p>
+        </div>
+      </div>
+      <TwoTabBar active="workout" tone="dark" onChange={() => {}} />
+    </div>
+  );
+}
+
+// Tutorial · se presenta desde el workout como hoja de abajo hacia arriba.
+// Dos estados: usuario nuevo y usuario que regresa porque su plan terminó.
+function TutorialSheetScreen({ onStart, onClose, returning }) {
+  const copy = returning ? {
+    img: "assets/tutorial_regreso.png",
+    eyebrow: "Tu plan terminó",
+    title: "Actualicemos tu plan",
+    body: "Completaste tu programa. Revisemos tus datos y tus objetivos para armarte el siguiente plan al nivel que ya alcanzaste.",
+    points: ["Ya avanzaste: tu nivel se ajusta", "Menos de 2 minutos", "Tu nueva rutina queda lista para hoy"],
+    cta: "Actualizar mi plan",
+  } : {
+    img: "assets/tutorial.png",
+    eyebrow: "Empieza aquí",
+    title: "Armemos tu plan de entrenamiento",
+    body: "Te haremos unas preguntas sobre tu experiencia, tus objetivos y los días que puedes entrenar. Con eso te sugerimos el programa y el nivel que mejor van contigo.",
+    points: ["Menos de 2 minutos", "Puedes cambiar de plan después", "Tu rutina queda lista para hoy"],
+    cta: "Comenzar tutorial",
+  };
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "#0F0F0F", ...ON_IMAGE }} data-screen-label="Tutorial">
+      <img src={copy.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 100%)" }} />
+      <div style={{ height: 56, flexShrink: 0 }} />
+      <div style={{ position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "0 20px 30px" }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 10px" }}>{copy.eyebrow}</p>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 25, color: "#fff", lineHeight: 1.2, letterSpacing: "-.5px", margin: "0 0 12px" }}>{copy.title}</h1>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "rgba(255,255,255,0.84)", lineHeight: 1.6, margin: "0 0 22px", maxWidth: 320, textWrap: "pretty" }}>{copy.body}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+          {copy.points.map((t) => (
+            <div key={t} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12" /></svg>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.86)" }}>{t}</span>
+            </div>
+          ))}
+        </div>
+        <Button variant="primary" fullWidth onClick={onStart}>{copy.cta}</Button>
+      </div>
+    </div>
+  );
+}
+
+window.WorkoutListScreen = WorkoutListScreen;
+window.PastRoutinesScreen = PastRoutinesScreen;
+window.WorkoutEmptyScreen = WorkoutEmptyScreen;
+window.TutorialSheetScreen = TutorialSheetScreen;
+
 // ── WorkoutDetail.jsx ───────────────────────────────────────────
-// FitFighters mobile — Routine detail for a tapped day (sections + start CTA).
+// FitFighters mobile — Detalle de rutina (aprobado 17 ago 2026, variante "header plano · CTA en footer").
+// Header a sangre con imagen de la rutina + overlay negro, barra flotante que colapsa,
+// tarjetas blancas con headers rojos y un solo CTA "Iniciar rutina" en el footer.
+
+// Instrucciones de rutina — pasan a data.js cuando el backend las entregue.
+const ROUTINE_INSTRUCTIONS = {
+  general: "Realiza la siguiente serie de ejercicios. Recuerda trabajar con una excelente técnica. Usa los parámetros de trabajo como las repeticiones o tiempo de ejecución como una referencia, pero siempre lo más importante será respetar las RIR que se mencionan en cada serie. También usa los intervalos de descanso como una referencia, lo importante es que estés completamente recuperado y listo para la siguiente serie de ejercicio.",
+  bySection: {
+    cycle: "Realiza el siguiente ejercicio. Recuerda trabajar con una excelente técnica y cerca del fallo muscular. Usa los parámetros de trabajo como las repeticiones o tiempo de ejecución como una referencia, pero siempre lo más importante será respetar las RIR que se mencionan en cada serie.",
+    stripset: "Realiza las series seguidas, sin descanso entre ellas, bajando el peso en cada cambio de repeticiones. Mantén una excelente técnica y llega cerca del fallo muscular en la última serie.",
+    fortime: "Completa todas las rondas lo más rápido posible, sin sacrificar la técnica. Descansa solo lo necesario para poder seguir moviéndote.",
+    amrap: "Haz la mayor cantidad de rondas posibles en el tiempo indicado. Busca un ritmo constante que puedas sostener hasta el final, no salgas al máximo.",
+    emom: "Cada minuto en punto realiza las repeticiones indicadas. El tiempo que te sobre dentro del minuto es tu descanso, así que cuida la técnica para ganarlo.",
+    cardio: "Mantén un ritmo constante durante todo el tiempo indicado. Si necesitas bajar la intensidad, hazlo sin detenerte por completo.",
+  },
+};
+
+// Superficies claras del detalle: tarjetas blancas con texto negro sobre el fondo de la app.
+const ROUTINE_DETAIL_SURFACES = {
+  "--ff-bg": "rgba(255,255,255,0.90)",
+  "--ff-surface": "#FFFFFF",
+  "--ff-surface-2": "#F2F2F2",
+  "--ff-border": "#E2E2E2",
+  "--ff-text": "#101010",
+  "--ff-text-2": "#4A4A4A",
+  "--ff-text-3": "#8E8E8E",
+  "--ff-red-light": "#CC2800",
+  "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+
+function InstructionNote({ text, color, tint, divider = true }) {
+  return (
+    <div style={{ padding: "11px 16px 13px", background: tint ? `linear-gradient(to right, color-mix(in srgb, ${color} 8%, transparent), transparent)` : "transparent", borderBottom: divider ? "1px solid var(--ff-border)" : "none" }}>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 12.5, color: "var(--ff-text-2)", lineHeight: 1.55, margin: 0, textWrap: "pretty" }}>{text}</p>
+    </div>
+  );
+}
+
+// Meta de la derecha: cada tipo de bloque muestra su magnitud al mismo nivel (series / rondas / duración).
+function blockMetaV2(block) {
+  if (block.type === "fortime") return block.rounds ? `${block.rounds} rondas` : null;
+  if (block.type === "emom") return block.minutesTotal ? `${block.minutesTotal} min` : null;
+  if (block.type === "amrap" || block.type === "cardio") return block.totalTimeSeconds ? fmtCountdown(block.totalTimeSeconds) : null;
+  return block.series ? `${block.series} series` : null;
+}
+
+function RoutineSectionCardRed({ block, open, onToggle, instruction, onExerciseTap }) {
+  const meta = blockMetaV2(block);
+  return (
+    <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+      <div onClick={onToggle} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "12px 14px 12px 16px", background: "var(--ff-red)", cursor: "pointer" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11.5, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#fff" }}>{block.name}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {meta && <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,.9)" }}>{meta}</span>}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .25s" }}><polyline points="6 9 12 15 18 9" /></svg>
+        </div>
+      </div>
+      {open && (
+        <div>
+          {instruction && <InstructionNote text={instruction} color="var(--ff-red)" tint />}
+          {block.exercises.map((ex, i) => <RoutineExerciseRow key={i} ex={ex} isLast={i === block.exercises.length - 1} onTap={onExerciseTap ? () => onExerciseTap(ex) : undefined} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Duración estimada de la rutina: trabajo + descansos, redondeada a 5 min.
+function estimateRoutineMinutes(blocks) {
+  const seconds = blocks.reduce((total, b) => {
+    const n = (b.exercises || []).length;
+    if (b.type === "rest") return total + (b.timeSeconds || 0);
+    if (b.type === "amrap" || b.type === "cardio") return total + (b.totalTimeSeconds || 0);
+    if (b.type === "emom") return total + (b.minutesTotal || 0) * 60;
+    if (b.type === "fortime") return total + (b.rounds || 1) * n * 40;
+    const series = b.series || 1;
+    return total + series * (n * 45 + (b.restBetweenSeriesSeconds || 0));
+  }, 0);
+  return Math.max(5, Math.round(seconds / 60 / 5) * 5);
+}
+
+// Los bloques de tipo cycle se numeran por tipo: "Ciclo 1", "Ciclo 2"…
+function numberCycleBlocks(blocks) {
+  let n = 0;
+  return blocks.map((b) => {
+    if (b.type !== "cycle") return b;
+    n += 1;
+    return { ...b, name: "Ciclo " + n };
+  });
+}
 
 function WorkoutDetailScreen({ item, onBack, onStart, blocksOverride, onExerciseTap }) {
   const d = window.FF_DATA;
+  const ins = d.routineInstructions || ROUTINE_INSTRUCTIONS;
   const day = item || { day: "Hoy", routine: d.program.day };
-  const isToday = day.status === "today";
   const isDone = day.status === "done";
-  const [markedDone, setMarkedDone] = React.useState(isDone);
-  const blocks = blocksOverride || d.routineDetailBlocks || [];
+  const blocks = numberCycleBlocks(blocksOverride || d.routineDetailBlocks || []);
+  const [closed, setClosed] = React.useState({});
+  const [scrollY, setScrollY] = React.useState(0);
+  const collapsed = scrollY > 96;
+  const cta = isDone ? "Repetir rutina" : "Iniciar rutina";
+  const heroImg = d.program.routineImg || "https://d3gfgejixr95u4.cloudfront.net/app/production/routines/1691718103462.jpg";
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Detalle rutina">
-      <AppBar variant="title" title={day.day} showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...ROUTINE_DETAIL_SURFACES }} data-screen-label="Detalle rutina">
+      {/* Barra flotante sobre la imagen; al hacer scroll se vuelve sólida y recoge el título. */}
+      <header style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 5, display: "flex", alignItems: "center", height: 56, padding: "0 12px 0 6px", gap: 8, pointerEvents: "none", background: collapsed ? "var(--ff-bg)" : "transparent", backdropFilter: collapsed ? "blur(12px)" : "none", WebkitBackdropFilter: collapsed ? "blur(12px)" : "none", borderBottom: collapsed ? "1px solid var(--ff-border)" : "1px solid transparent", transition: "background .2s ease, border-color .2s ease" }}>
+        <span style={{ pointerEvents: "auto" }}><CircleIconBtn kind="back" onClick={onBack} onMedia={!collapsed} /></span>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", opacity: collapsed ? 1 : 0, transform: collapsed ? "translateY(0)" : "translateY(8px)", transition: "opacity .2s ease, transform .2s ease" }}>{day.routine}</span>
+      </header>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 2px 4px" }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".1em", margin: 0 }}>{d.program.name}{day.week ? ` · Semana ${day.week}` : ""}{day.date ? ` · ${day.date}` : ""}</p>
-          {isToday && (
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "#fff", background: "var(--ff-red)", padding: "1px 6px", borderRadius: 999 }}>HOY</span>
+      <div onScroll={(e) => setScrollY(e.currentTarget.scrollTop)} style={{ flex: 1, overflowY: "auto", padding: "0 16px 78px" }}>
+        {/* Header a sangre: imagen de la rutina con overlay negro, título e instrucción general centrados. */}
+        <div style={{ position: "relative", display: "flex", alignItems: "center", minHeight: 281, margin: "0 -16px 16px", padding: "64px 20px 24px", overflow: "hidden" }}>
+          {heroImg && (
+            <img src={heroImg} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transform: `translateY(${scrollY * 0.35}px) scale(1.12)`, transformOrigin: "top center", willChange: "transform" }} />
           )}
-          {markedDone && (
-            <span style={{ fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--ff-green)", background: "rgba(46,207,122,0.14)", border: "0.5px solid rgba(46,207,122,0.3)", padding: "1px 6px", borderRadius: 999 }}>COMPLETADA</span>
-          )}
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.40)" }} />
+          <div style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "#fff", lineHeight: 1.15, letterSpacing: "-.5px", margin: "0 0 14px" }}>{day.routine}</h1>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.88)", lineHeight: 1.6, margin: 0, textWrap: "pretty" }}>{ins.general}</p>
+          </div>
         </div>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", lineHeight: 1.2, letterSpacing: "-.3px", margin: "0 2px 18px" }}>{day.routine}</h1>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {blocks.map((b, i) => b.type === "rest" ? <RoutineRestStrip key={i} block={b} /> : <RoutineSectionCard key={i} block={b} defaultOpen={i === 0} onExerciseTap={onExerciseTap ? (ex) => onExerciseTap(ex, i) : undefined} />)}
+          {blocks.map((b, i) => b.type === "rest"
+            ? <RoutineRestStrip key={i} block={b} />
+            : <RoutineSectionCardRed
+                key={i}
+                block={b}
+                open={!closed[i]}
+                onToggle={() => setClosed(c => ({ ...c, [i]: !c[i] }))}
+                instruction={ins.bySection[b.type]}
+                onExerciseTap={onExerciseTap ? (ex) => onExerciseTap(ex, i) : undefined}
+              />)}
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)", display: "flex", flexDirection: "column", gap: 10 }}>
-        <Button variant="primary" onClick={onStart}>{markedDone ? "Repetir con entrenador virtual" : "Comenzar con entrenador virtual"}</Button>
-        {/* Para quienes siguen la rutina leyendo la descripción, sin abrir el entrenador virtual */}
-        <button
-          onClick={() => setMarkedDone(v => !v)}
-          style={{ width: "100%", padding: "12px 16px", borderRadius: 10, border: "1px solid var(--ff-border)", background: markedDone ? "rgba(46,207,122,0.1)" : "var(--ff-surface)", color: markedDone ? "var(--ff-green)" : "var(--ff-text-2)", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">{markedDone ? <><circle cx="12" cy="12" r="9" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></> : <polyline points="20 6 9 17 4 12" />}</svg>
-          {markedDone ? "Desmarcar como hecha" : "Marcar rutina como hecha"}
-        </button>
+      <div style={{ flexShrink: 0, padding: "16px 16px 26px", background: "linear-gradient(to top, var(--ff-bg) 80%, transparent)", marginTop: -44, position: "relative", zIndex: 2 }}>
+        <Button variant="primary" onClick={onStart}>{cta}</Button>
       </div>
     </div>
   );
@@ -1047,8 +1593,50 @@ function WorkoutDetailScreen({ item, onBack, onStart, blocksOverride, onExercise
 
 window.WorkoutDetailScreen = WorkoutDetailScreen;
 
+// ── Barra superior flotante ───────────────────────────────────────
+// Regla del diseño: la barra nace transparente con el control flotando; solo se vuelve
+// sólida y muestra el título cuando el contenido scrollea y el usuario baja.
+function useBarScroll() {
+  const [scrolled, setScrolled] = React.useState(false);
+  const onScroll = (e) => { const s = e.currentTarget.scrollTop > 6; setScrolled((p) => (p === s ? p : s)); };
+  return [scrolled, onScroll];
+}
+
+function CircleIconBtn({ kind = "back", onClick, onMedia, plain }) {
+  const stroke = onMedia ? "#fff" : "var(--ff-text)";
+  return (
+    <button onClick={onClick} aria-label={kind === "close" ? "Cerrar" : "Atrás"} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+      background: plain ? "transparent" : onMedia ? "rgba(0,0,0,0.45)" : "rgba(20,20,20,0.06)", backdropFilter: onMedia ? "blur(6px)" : "none", WebkitBackdropFilter: onMedia ? "blur(6px)" : "none", transition: "background .2s ease" }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {kind === "close" ? <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g> : <path d="M19 12H5M12 5l-7 7 7 7" />}
+      </svg>
+    </button>
+  );
+}
+
+function FloatingTopBar({ title, onBack, onClose, scrolled }) {
+
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px",
+      background: scrolled ? "var(--ff-bg)" : "transparent", borderBottom: scrolled ? "1px solid var(--ff-border)" : "1px solid transparent", transition: "background .2s ease, border-color .2s ease" }}>
+      {onBack ? <CircleIconBtn kind="back" onClick={onBack} plain={scrolled} /> : <span style={{ width: 40, flexShrink: 0 }} />}
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.2px", opacity: scrolled ? 1 : 0, transition: "opacity .2s ease", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+      {onClose ? <CircleIconBtn kind="close" onClick={onClose} plain={scrolled} /> : <span style={{ width: 40, flexShrink: 0 }} />}
+    </div>
+  );
+}
+
 // ── ExerciseDetail.jsx ────────────────────────────────────────────
 // FitFighters mobile — Exercise detail: video, muscles, instructions. Paridad con ExerciseDetailScreen.kt.
+
+// Sin app bar: el video sube al tope y el volver flota encima.
+function MediaBackBtn({ onBack }) {
+  return (
+    <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}>
+      <CircleIconBtn kind="back" onClick={onBack} onMedia />
+    </div>
+  );
+}
 
 function getExerciseInfo(name) {
   return (window.FF_DATA.exerciseLibrary || {})[name] || { muscles: [], instructions: [], videoUrl: null };
@@ -1058,10 +1646,10 @@ function ExerciseDetailScreen({ exercise, onBack, onChangeExercise }) {
   const ex = exercise || { name: "Ejercicio", img: null };
   const info = getExerciseInfo(ex.name);
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Detalle de ejercicio">
-      <AppBar variant="title" title={ex.name} showBack onBack={onBack} />
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        <div style={{ width: "100%", height: 220, background: "#000" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Detalle de ejercicio">
+      <div style={{ width: "100%", paddingTop: "56.25%", background: "#000", position: "relative", flexShrink: 0, overflow: "hidden" }}>
+        <MediaBackBtn onBack={onBack} />
+        <div style={{ position: "absolute", inset: 0 }}>
           {info.videoUrl ? (
             <video key={info.videoUrl} src={info.videoUrl} poster={ex.img} controls loop muted playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
           ) : ex.img ? (
@@ -1073,8 +1661,11 @@ function ExerciseDetailScreen({ exercise, onBack, onChangeExercise }) {
             </div>
           )}
         </div>
+      </div>
 
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         <div style={{ padding: "18px 16px 8px", display: "flex", flexDirection: "column", gap: 18 }}>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", margin: 0, lineHeight: 1.3, letterSpacing: "-.3px", textWrap: "pretty" }}>{ex.name}</h1>
           {info.muscles.length > 0 && (
             <div>
               <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: "0 0 6px" }}>Músculos</p>
@@ -1093,7 +1684,7 @@ function ExerciseDetailScreen({ exercise, onBack, onChangeExercise }) {
           )}
         </div>
       </div>
-      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "var(--ff-bg)", borderTop: "1px solid var(--ff-border)" }}>
+      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
         <Button variant="primary" onClick={onChangeExercise}>Cambiar ejercicio</Button>
       </div>
     </div>
@@ -1195,10 +1786,9 @@ function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
   );
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar ejercicio">
-      <AppBar variant="title" title="Cambiar ejercicio" showBack onBack={onBack} />
-
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Cambiar ejercicio">
       <div style={{ width: "100%", paddingTop: "56.25%", background: "#000", position: "relative", flexShrink: 0, minHeight: 0, overflow: "hidden" }}>
+        <MediaBackBtn onBack={onBack} />
         {media("contain")}
       </div>
 
@@ -1219,7 +1809,7 @@ function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
         </div>
       ) : emptyState}
 
-      <div style={{ flexShrink: 0, padding: "14px 16px 28px" }}>{cta}</div>
+      <div style={{ flexShrink: 0, padding: "14px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>{cta}</div>
     </div>
   );
 }
@@ -1237,11 +1827,12 @@ function ProfileSectionLabel({ children }) {
   return <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "20px 2px 8px" }}>{children}</p>;
 }
 
-function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations }) {
+function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onClose }) {
+  const [scrolled, onScroll] = useBarScroll();
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Perfil">
-      <AppBar variant="logo" />
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 90px" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Perfil">
+      <FloatingTopBar title="Perfil" onClose={onClose} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, overflowY: "auto", padding: "64px 16px 90px" }}>
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0 20px" }}>
@@ -1308,7 +1899,7 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
         <p style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 10, color: "var(--ff-text-3)", padding: 16 }}>FitFighters v2.0.0</p>
       </div>
 
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+      <div style={{ ...DARK_NAV_CONTEXT, position: "absolute", left: 0, right: 0, bottom: 0 }}>
         <BottomNav active={tab} onChange={onTab} />
       </div>
     </div>
@@ -1701,9 +2292,7 @@ function TrainerVideoScreen({ exercise, onClose }) {
         ) : (
           <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.5)" }}>Video no disponible</span>
         )}
-        <button onClick={onClose} style={{ position: "absolute", top: 14, left: 14, width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
+        <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}><CircleIconBtn kind="close" onClick={onClose} onMedia /></div>
         <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.55)", borderRadius: 999, padding: "4px 10px", border: "1px solid rgba(255,255,255,0.15)" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /></svg>
           <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Pantalla completa</span>
@@ -2035,6 +2624,564 @@ function TrainerScreen({ onExit, onFinish, initialBlockIndex = 0, initialPaused 
 }
 
 window.TrainerScreen = TrainerScreen;
+// Alias propio: el bundle del design system también publica window.TrainerScreen y gana
+// la resolución, así que el borrador monta el entrenador aprobado por este nombre.
+window.FFApprovedTrainerScreen = TrainerScreen;
+
+// ── TrainerImmersive.jsx ────────────────────────────────────────
+// Reproductor inmersivo (P2 · aprobado 31 ago 2026): video 16:9 a sangre con fondo
+// ambiental desenfocado, número héroe dentro de un anillo de progreso teñido por el
+// color de la sección, barra de posición en la rutina sobre el transporte y cola por
+// secciones. Convive con TrainerScreen hasta que se retire el entrenador con tabs.
+
+// ── Catálogo del borrador ────────────────────────────────────────
+// Propuesta de superficies claras: el fondo sigue en #0F0F0F y todo lo demás se construye
+// con blanco translúcido encima. Al ser blanco y no gris opaco, cada capa se aclara sin
+// ensuciarse y el rojo de marca sigue siendo el único color fuerte.
+const LIGHT_SURFACES = {
+  "--ff-surface": "rgba(255,255,255,0.07)",
+  "--ff-surface-2": "rgba(255,255,255,0.12)",
+  "--ff-border": "rgba(255,255,255,0.16)",
+  "--ff-text-2": "rgba(255,255,255,0.72)",
+  "--ff-text-3": "rgba(255,255,255,0.45)",
+  "--ff-navbar": "rgba(255,255,255,0.05)",
+};
+
+function fmtClockR6(total) {
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  return h ? `${h}:${mm}:${String(s).padStart(2, "0")}` : `${mm}:${String(s).padStart(2, "0")}`;
+}
+
+function R6Icon({ size = 20, stroke = "var(--ff-text)", w = 2, children }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
+}
+
+function R6CtrlBtn({ primary, dim, onClick, children }) {
+  const size = primary ? 60 : 46;
+  return (
+    <button onClick={onClick} style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0, cursor: "pointer", padding: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: primary ? "var(--ff-red)" : "var(--ff-surface)",
+      border: primary ? "none" : "1px solid var(--ff-border)",
+      opacity: dim ? 0.4 : 1,
+    }}>{children}</button>
+  );
+}
+
+function R6Thumb({ img, size = 44, dim }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "var(--ff-surface-2)" }}>
+      {img ? <div style={{ width: "100%", height: "100%", backgroundImage: `url(${img})`, backgroundSize: "cover", backgroundPosition: "center", filter: dim ? "saturate(.2) brightness(.9)" : "none" }} /> : null}
+    </div>
+  );
+}
+
+function R6QueueGroup({ group, status, open, onToggle, onDragStart, onDragOver, onDrop }) {
+  const { block, rest } = group;
+  const list = r6SectionExercises(block);
+  const single = list.length === 1;
+  const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
+  const done = status === "done";
+  const current = status === "current";
+  return (
+    <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
+      style={{ background: "var(--ff-surface)", border: current ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", borderRadius: 14, opacity: done ? 0.55 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px" }}>
+        <R6DragHandle />
+        <R6Check done={done} />
+        <R6Thumb img={single ? list[0].img : (list[0] || {}).img} dim={done} />
+        <div onClick={single ? undefined : onToggle} style={{ flex: 1, minWidth: 0, cursor: single ? "default" : "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>
+              {current ? "En curso" : done ? "Completada" : "Pendiente"}
+            </span>
+          </div>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 12.5, color: "var(--ff-text)", margin: "3px 0 0", lineHeight: 1.3, letterSpacing: "-.2px", overflowWrap: "anywhere" }}>
+            {single ? list[0].name : block.name}
+          </p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "2px 0 0" }}>
+            {single ? (list[0].meta === r6SectionMeta(block).split(" · ")[1] ? r6SectionMeta(block) : `${r6SectionMeta(block)} · ${list[0].meta}`) : `${r6SectionMeta(block)} · ${list.length} ejercicios`}
+          </p>
+        </div>
+        {single ? <R6SwapBtn /> : (
+          <button onClick={onToggle} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <R6Icon size={15} stroke="var(--ff-text-2)"><polyline points="6 9 12 15 18 9" style={{ transformOrigin: "center", transform: open ? "rotate(180deg)" : "none" }} /></R6Icon>
+          </button>
+        )}
+      </div>
+      {open && !single && (
+        <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--ff-border)" }}>
+          {list.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px 9px 42px", borderTop: i ? "1px solid var(--ff-border)" : "none" }}>
+              <R6Thumb img={it.img} size={34} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{it.name}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "2px 0 0" }}>{it.meta}</p>
+              </div>
+              <R6SwapBtn />
+            </div>
+          ))}
+        </div>
+      )}
+      {rest && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px 10px 42px", borderTop: "1px dashed var(--ff-border)" }}>
+          <R6Icon size={13} stroke="var(--ff-section-rest, #6B7A8D)"><g><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></g></R6Icon>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)" }}>Descanso {fmtCountdown(rest.timeSeconds)} · viaja con esta sección</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function R6QueueSheet({ groups, currentIdx, closedIds, onToggleGroup, onClose, onReorder, finish, onFinish }) {
+  const dragFrom = React.useRef(null);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={finish ? undefined : onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", maxHeight: "78%", display: "flex", flexDirection: "column", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", border: "1px solid var(--ff-border)", borderBottom: "none", overflow: "hidden" }}>
+        {!finish && (
+          <div onClick={onClose} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 0 2px", cursor: "pointer", flexShrink: 0 }}>
+            <span style={{ width: 38, height: 4, borderRadius: 2, background: "var(--ff-border)" }} />
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: finish ? "18px 18px 12px" : "8px 18px 12px", flexShrink: 0 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0, letterSpacing: "-.2px" }}>{finish ? "Rutina completa" : "Cola de la rutina"}</p>
+          {!finish && (
+            <button onClick={onClose} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <R6Icon size={16} stroke="var(--ff-text-2)"><polyline points="6 9 12 15 18 9" /></R6Icon>
+            </button>
+          )}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 22px", display: "flex", flexDirection: "column", gap: 8, background: "var(--ff-bg)" }}>
+          {groups.map((g, i) => (
+            <R6QueueGroup key={g.id} group={g} status={finish ? "done" : g.idx < currentIdx ? "done" : g.idx === currentIdx ? "current" : "pending"}
+              open={!closedIds.includes(g.id)} onToggle={() => onToggleGroup(g.id)}
+              onDragStart={() => { dragFrom.current = i; }} onDragOver={(e) => e.preventDefault()}
+              onDrop={() => { const from = dragFrom.current; dragFrom.current = null; if (from == null || from === i) return; const next = groups.slice(); const [m] = next.splice(from, 1); next.splice(i, 0, m); onReorder(next); }} />
+          ))}
+        </div>
+        {finish && (
+          <div style={{ flexShrink: 0, padding: "12px 16px 20px", borderTop: "1px solid var(--ff-border)", background: "var(--ff-surface)" }}>
+            <button style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }} onClick={onFinish}>Finalizar rutina</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function R6Countdown({ n, name }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 240, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 20, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Prepárate</span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 72, lineHeight: 1.1, color: "var(--ff-red)" }}>{n}</span>
+        {name && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", textAlign: "center" }}>{name}</span>}
+      </div>
+    </div>
+  );
+}
+
+function r6Steps(block) {
+  if (block.type === "rest") return [{ rest: true, seconds: block.timeSeconds, ex: { img: block.img, name: "Descanso" } }];
+  if (block.type === "cycle") {
+    const out = [];
+    for (let s = 1; s <= (block.series || 1); s++) (block.exercises || []).forEach((ex) => out.push({ ex, serie: s }));
+    return out;
+  }
+  if (block.type === "stripset") {
+    return (block.exercises || []).flatMap((ex) => (ex.sequence || [ex.reps]).map((reps, i) => ({ ex, reps, drop: i + 1, drops: (ex.sequence || []).length })));
+  }
+  if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv, i) => ({ ex: iv, seconds: iv.workSeconds, ivIdx: i }));
+  if (block.exercises) return block.exercises.map((ex) => ({ ex }));
+  if (block.exercise) return [{ ex: block.exercise, seconds: block.type === "cardio" ? block.totalTimeSeconds : null, reps: block.repsInitial }];
+  return [];
+}
+
+// Valor héroe histórico (P1–P4): se conserva porque las variantes viejas del borrador lo usan.
+function r6HeroLegacy(block, step) {
+  const ex = step.ex || {};
+  const secs = step.seconds ?? (ex.mode === "time" ? ex.timeSeconds : (!ex.reps && ex.timeSeconds ? ex.timeSeconds : null));
+  if (secs) return { kind: "time", seconds: secs, label: "Tiempo" };
+  const reps = step.reps ?? ex.reps;
+  if (!reps) return { kind: "failure", label: "Hasta no poder más" };
+  return { kind: "reps", value: String(reps), label: "Repeticiones" };
+}
+
+function r6SectionExercises(block) {
+  if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo · ${iv.restSeconds}s descanso` }));
+  if (block.exercises) return block.exercises.map((ex) => ({ name: ex.name, img: ex.img, meta: ex.sequence ? ex.sequence.join(" · ") + " reps" : ex.reps ? `${ex.reps} reps` : ex.timeSeconds ? fmtCountdown(ex.timeSeconds) : "Al fallo" }));
+  if (block.exercise) return [{ name: block.exercise.name, img: block.exercise.img, meta: block.type === "emom" ? `${block.repsInitial} reps al minuto` : fmtCountdown(block.totalTimeSeconds || 0) }];
+  return [];
+}
+
+function r6SectionMeta(block) {
+  const label = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label;
+  if (block.type === "cycle") return `${label} · ${block.series} series`;
+  if (block.type === "fortime") return `${label} · ${block.rounds} rondas`;
+  if (block.type === "amrap") return `${label} · ${fmtCountdown(block.totalTimeSeconds)}`;
+  if (block.type === "emom") return `${label} · ${block.minutesTotal} min`;
+  if (block.type === "cardio") return `${label} · ${fmtCountdown(block.totalTimeSeconds || 0)}`;
+  return label;
+}
+
+// Cada sección arrastra su descanso: el grupo es la unidad que se mueve.
+function r6Groups(blocks) {
+  const groups = [];
+  blocks.forEach((b, i) => {
+    if (b.type === "rest") { if (groups.length) groups[groups.length - 1].rest = b; return; }
+    groups.push({ id: b.id, block: b, rest: null, idx: i });
+  });
+  return groups;
+}
+
+// Espejo de getDisplay() del reproductor aprobado: mismo héroe, misma etiqueta, mismo
+// panel y mismo chip de cronómetro por tipo de sección. No inventar variantes aquí.
+function r6ClockBase(block) {
+  if (block.type === "fortime") return { secs: 138, up: true, l: "Tiempo" };
+  if (block.type === "amrap") return { secs: Math.max(0, (block.totalTimeSeconds || 0) - 24), up: false, l: "Restante" };
+  if (block.type === "cardio" && block.mode === "interval") return { secs: Math.max(0, (block.totalTimeSeconds || 0) - 24), up: false, l: "Bloque" };
+  return null;
+}
+
+function r6Display(block, step, idx, total) {
+  const ex = step.ex || {};
+  if (block.type === "rest") return { kind: "time", seconds: block.timeSeconds, label: "Descanso" };
+  if (block.type === "cycle") {
+    const panel = [{ v: step.serie, l: "Serie" }, { v: block.series, l: "Total" }];
+    if (ex.mode === "time" || (!ex.reps && ex.timeSeconds)) return { kind: "time", seconds: ex.timeSeconds, label: "Tiempo", panel };
+    if (ex.mode === "failure" || !ex.reps) return { kind: "failure", label: "Hasta no poder más", panel };
+    return { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel };
+  }
+  if (block.type === "stripset") {
+    return { kind: "reps", value: String(step.reps), label: "Repeticiones", panel: [{ v: step.drop, l: "Serie" }, { v: step.drops, l: "Total" }] };
+  }
+  if (block.type === "fortime") {
+    return { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel: [{ v: 1, l: "Ronda" }, { v: block.rounds, l: "Total" }] };
+  }
+  if (block.type === "amrap") {
+    const isTime = !ex.reps;
+    const panel = [{ v: 0, l: "Rondas" }, { v: `${idx + 1}/${total}`, l: "Ejercicio" }];
+    return isTime
+      ? { kind: "time", seconds: ex.timeSeconds, label: "Tiempo", panel }
+      : { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel };
+  }
+  if (block.type === "emom") {
+    const reps = (block.repsInitial || 0);
+    return { kind: "time", seconds: 60, label: "Tiempo", panel: [{ v: reps, l: "Repeticiones" }, { v: 0, l: "Min. completados" }] };
+  }
+  if (block.type === "cardio") {
+    if (block.mode === "traditional") return { kind: "time", seconds: block.totalTimeSeconds, label: "Tiempo restante" };
+    if (ex.reps) return { kind: "reps", value: String(ex.reps), label: "Repeticiones" };
+    return { kind: "time", seconds: ex.workSeconds || step.seconds, label: "Tiempo" };
+  }
+  return { kind: "reps", value: String(ex.reps || 0), label: "Repeticiones" };
+}
+
+// ── P2 · Reproductor inmersivo ───────────────────────────────────
+// Tres cambios frente al rediseño actual: el video pasa a sangre completa y deja de ser
+// una franja; el número héroe vive dentro de un anillo que se vacía (o se llena por serie),
+// así siempre hay algo en movimiento; y el color de la sección tiñe anillo y número, de
+// modo que un Cycle no se ve igual que un AMRAP. Todo lo demás flota en blanco translúcido.
+const R7_SHEET = {
+  "--ff-bg": "#0F0F0F", "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222",
+  "--ff-border": "#2A2A2A", "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+
+// El anillo se rige por la naturaleza de la sección, no por el paso:
+// cycle / stripset / for time van por series (arcos que se llenan, aunque el
+// ejercicio sea de tiempo); amrap, emom, cardio y descanso van por tiempo en
+// decremento (el anillo se completa conforme baja). EMOM reinicia cada minuto.
+function r7RingSpec(block, step, steps, sIdx, remaining, clockSecs) {
+  const t = block.type;
+  if (t === "cycle") return { mode: "seg", seg: { n: block.series || 1, i: step.serie || 1 } };
+  if (t === "stripset") return { mode: "seg", seg: { n: step.drops || 1, i: step.drop || 1 } };
+  if (t === "fortime") return { mode: "seg", seg: { n: block.rounds || 1, i: step.round || 1 } };
+
+  const byTime = (total, left) => {
+    if (!total) return { mode: "none" };
+    return { mode: "time", progress: Math.min(1, Math.max(0, 1 - left / total)) };
+  };
+  if (t === "rest") return byTime(block.timeSeconds, remaining);
+  if (t === "emom") return byTime(60, remaining);
+  if (t === "amrap") return byTime(block.totalTimeSeconds, clockSecs);
+  if (t === "cardio") return byTime(block.totalTimeSeconds, block.mode === "traditional" ? remaining : clockSecs);
+  return { mode: "seg", seg: { n: steps.length || 1, i: sIdx + 1 } };
+}
+
+// Un solo anillo con dos modos: si el paso tiene tiempo se vacía; si es por repeticiones
+// se parte en tantos arcos como series y se van llenando. En ambos casos significa avance.
+function R7Ring({ size = 236, stroke = 5, color, mode, progress = 0, seg, children }) {
+  const r = (size - stroke) / 2;
+  const C = 2 * Math.PI * r;
+  const gap = 7;
+  const arcs = [];
+  if (mode === "time") {
+    arcs.push({ len: Math.max(0, C * progress), off: 0, on: true });
+  } else if (mode === "seg") {
+    const each = C / seg.n;
+    for (let i = 0; i < seg.n; i++) arcs.push({ len: Math.max(2, each - gap), off: -i * each, on: i < seg.i, cur: i === seg.i - 1 });
+  }
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={stroke} />
+        {arcs.map((a, i) => (
+          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" strokeLinecap="round"
+            stroke={a.on ? color : "transparent"} strokeWidth={stroke} opacity={a.cur ? 0.5 : 1}
+            strokeDasharray={`${a.len} ${C - a.len}`} strokeDashoffset={a.off}
+            style={{ transition: mode === "time" ? "stroke-dasharray .95s linear" : "none" }} />
+        ))}
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>{children}</div>
+    </div>
+  );
+}
+
+function R7Stat({ value, label }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px" }}>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", lineHeight: 1 }}>{value}</span>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginTop: 4 }}>{label}</span>
+    </div>
+  );
+}
+
+function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, onExit, onFinish }) {
+  const blocks = window.FF_DATA.trainerBlocks || [];
+  const [bIdx] = React.useState(blockIdx);
+  const [sIdx, setSIdx] = React.useState(stepIdx);
+  const [isPaused, setPaused] = React.useState(paused);
+  const [queue, setQueue] = React.useState(queueOpen || finishOpen);
+  const [finished, setFinished] = React.useState(finishOpen);
+  const [closedGroups, setClosedGroups] = React.useState([]);
+  const [groups, setGroups] = React.useState(() => r6Groups(blocks));
+  const [elapsed, setElapsed] = React.useState(724);
+  const [preroll, setPreroll] = React.useState(showPreroll ? 3 : null);
+  const [clockSecs, setClockSecs] = React.useState(() => { const c = r6ClockBase((window.FF_DATA.trainerBlocks || [])[blockIdx] || {}); return c ? c.secs : 0; });
+  const touchY = React.useRef(null);
+
+  const block = blocks[bIdx] || blocks[0];
+  const steps = r6Steps(block);
+  const step = steps[Math.min(sIdx, steps.length - 1)] || {};
+  const hero = r6Display(block, step, sIdx, steps.length);
+  // Los frames estáticos por tiempo arrancan a mitad de cuenta para que el anillo se vea avanzado.
+  const seedRemaining = (h) => {
+    const s = h.seconds || 0;
+    if (live || !s) return s;
+    return ["rest", "emom", "cardio"].indexOf(block.type) < 0 ? s : Math.round(s * 0.38);
+  };
+  const [remaining, setRemaining] = React.useState(() => seedRemaining(hero));
+  const clockBase = block.type === "rest" ? null : r6ClockBase(block);
+  const isLastStep = !blocks[bIdx + 1] && sIdx >= steps.length - 1;
+  const finishNow = () => { setFinished(true); setQueue(true); };
+
+  React.useEffect(() => { setRemaining(seedRemaining(hero)); }, [sIdx]);
+  React.useEffect(() => {
+    if (!live || isPaused || !clockBase) return;
+    const t = setInterval(() => setClockSecs((s) => clockBase.up ? s + 1 : (s > 1 ? s - 1 : clockBase.secs)), 1000);
+    return () => clearInterval(t);
+  }, [isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused) return;
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused || preroll === null || showPreroll) return;
+    const t = setTimeout(() => setPreroll((n) => (n > 1 ? n - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [preroll, isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused || preroll !== null || hero.kind !== "time") return;
+    const t = setInterval(() => setRemaining((r) => {
+      if (r > 1) return r - 1;
+      if (isLastStep) { finishNow(); return 0; }
+      return hero.seconds || 0;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [isPaused, preroll, sIdx]);
+
+  const goStep = (d) => {
+    if (d > 0 && isLastStep) { finishNow(); return; }
+    const n = sIdx + d;
+    if (n < 0 || n >= steps.length) return;
+    setSIdx(n);
+  };
+
+  const sec = SECTION_TYPES[block.type] || SECTION_TYPES.cycle;
+  const color = block.type === "rest" ? "#6B7A8D" : sec.color;
+  const heroValue = hero.kind === "time" ? fmtCountdown(remaining) : hero.kind === "reps" ? hero.value : "Al fallo";
+  const ringSpec = r7RingSpec(block, step, steps, sIdx, remaining, clockSecs);
+  const curImg = (step.ex || {}).img || block.img;
+  const curName = block.type === "rest" ? "Descanso" : (step.ex || {}).name;
+  const muscles = block.type === "rest" ? [] : ((step.ex || {}).muscles || []);
+  const panel = hero.panel || null;
+  const curGroupIdx = groups.findIndex((g) => g.idx === (block.type === "rest" ? bIdx - 1 : bIdx));
+  const dimmed = isPaused || block.type === "rest";
+
+  const nextUp = (() => {
+    if (isLastStep) return { title: "Finalizar entrenamiento", sub: "Verás el resumen de tu rutina", finish: true };
+    if (sIdx + 1 < steps.length) {
+      const ns = steps[sIdx + 1];
+      const nh = r6HeroLegacy(block, ns);
+      if (block.restBetweenSeconds) return { title: `Descanso ${fmtCountdown(block.restBetweenSeconds)}`, sub: `Luego: ${ns.ex.name}`, img: ns.ex.img, rest: true };
+      return { title: ns.ex.name, sub: nh.kind === "time" ? fmtCountdown(nh.seconds) : nh.kind === "reps" ? `${nh.value} reps` : "Al fallo", img: ns.ex.img };
+    }
+    const nb = blocks[bIdx + 1];
+    if (!nb) return { title: "Última sección", sub: "Al terminar verás tu resumen" };
+    if (nb.type === "rest") return { title: `Descanso ${fmtCountdown(nb.timeSeconds)}`, sub: "Entre secciones", img: nb.img, rest: true };
+    const list = r6SectionExercises(nb);
+    return { title: nb.name, sub: `${r6SectionMeta(nb)} · ${list.length} ejercicio${list.length > 1 ? "s" : ""}`, img: (list[0] || {}).img };
+  })();
+
+  return (
+    <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#0B0B0B", ...LIGHT_SURFACES }} data-screen-label="Reproductor inmersivo">
+      {/* Los videos son 16:9: no se recortan. El plate respeta su proporción a todo el ancho
+          y el mismo frame, escalado y desenfocado, llena el resto como fondo ambiental. */}
+      <div style={{ position: "absolute", inset: -40, backgroundImage: `url(${curImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: `blur(44px) saturate(${dimmed ? 0.15 : 0.7}) brightness(${dimmed ? 0.3 : 0.42})`, transform: "scale(1.15)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 262, backgroundImage: `url(${curImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: dimmed ? "saturate(.25) brightness(.5)" : "none", WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(11,11,11,.72) 0%, rgba(11,11,11,.08) 18%, rgba(11,11,11,.22) 38%, rgba(11,11,11,.66) 58%, rgba(11,11,11,.92) 78%, #0B0B0B 100%)" }} />
+
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 18px 22px" }}>
+        {/* El video queda limpio: encima solo vive el cierre */}
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 30, flexShrink: 0 }}>
+          <button title="Salir del entrenador" onClick={onExit} style={{ width: 44, height: 44, marginRight: -10, borderRadius: "50%", background: "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <R6Icon size={18} stroke="#fff" w={2.2}><g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g></R6Icon>
+          </button>
+        </div>
+
+        {/* Héroe dentro del anillo */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, paddingTop: 54 }}>
+          <R7Ring color={color} mode={ringSpec.mode} progress={ringSpec.progress} seg={ringSpec.seg}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: hero.kind === "failure" ? 30 : hero.kind === "time" ? 48 : 62, lineHeight: 1, color: "#fff", letterSpacing: "-1px" }}>{heroValue}</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase", color: color, marginTop: 6 }}>
+              {hero.kind === "failure" ? "Hasta no poder más" : hero.label}
+            </span>
+            {clockBase && (
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.55)", marginTop: 8 }}>{clockBase.l} {fmtCountdown(clockSecs)}</span>
+            )}
+          </R7Ring>
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: 0, lineHeight: 1.35, textAlign: "center", letterSpacing: "-.3px", textWrap: "pretty" }}>{curName}</p>
+            {muscles.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
+                {muscles.map((m) => (
+                  <span key={m} style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 500, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.62)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 999, padding: "3px 9px", lineHeight: 1.4 }}>{m}</span>
+                ))}
+              </div>
+            )}
+            {panel && (
+              <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
+                <R7Stat value={panel[0].v} label={panel[0].l} />
+                <div style={{ width: 1, height: 26, background: "rgba(255,255,255,.18)" }} />
+                <R7Stat value={panel[1].v} label={panel[1].l} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Dónde vas en la rutina, pegado a los controles que te mueven por ella */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 18, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.72)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {block.type === "rest" ? "Descanso" : sec.label} · {Math.min(curGroupIdx + 1, groups.length)} de {groups.length}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <R6Icon size={12} stroke="rgba(255,255,255,.5)"><g><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></g></R6Icon>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.75)" }}>{fmtClockR6(elapsed)}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 3 }}>
+            {groups.map((g, i) => (
+              <span key={g.id} style={{ flex: 1, height: 3, borderRadius: 2, background: i < curGroupIdx ? "rgba(255,255,255,.85)" : i === curGroupIdx ? color : "rgba(255,255,255,.18)" }} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 16, flexShrink: 0 }}>
+          <R6CtrlBtn dim={sIdx === 0} onClick={() => goStep(-1)}>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></g></R6Icon>
+          </R6CtrlBtn>
+          <R6CtrlBtn primary onClick={() => setPaused((p) => !p)}>
+            {isPaused ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="7 4 20 12 7 20" /></svg>
+              : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>}
+          </R6CtrlBtn>
+          <R6CtrlBtn onClick={() => goStep(1)}>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></g></R6Icon>
+          </R6CtrlBtn>
+          <R6CtrlBtn>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></g></R6Icon>
+          </R6CtrlBtn>
+        </div>
+
+        {/* A continuación · más delgado, ya no compite con el anillo */}
+        <button onClick={() => (isLastStep ? finishNow() : setQueue(true))}
+          onTouchStart={(e) => { touchY.current = e.touches[0].clientY; }}
+          onTouchEnd={(e) => { if (touchY.current !== null && touchY.current - e.changedTouches[0].clientY > 24) (isLastStep ? finishNow() : setQueue(true)); touchY.current = null; }}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 14, padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}>
+          {nextUp.img ? <R6Thumb img={nextUp.img} size={34} dim={nextUp.rest} /> : (
+            <span style={{ width: 34, height: 34, borderRadius: 9, background: nextUp.finish ? "var(--ff-red)" : "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <R6Icon size={15} stroke="#fff"><polyline points="20 6 9 17 4 12" /></R6Icon>
+            </span>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.5)" }}>{nextUp.finish ? "Al terminar" : "A continuación"}</span>
+            <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 12, color: "#fff", margin: "2px 0 0", letterSpacing: "-.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nextUp.title}</span>
+          </div>
+          <span style={{ display: "flex", alignItems: "center", flexShrink: 0, paddingRight: 2 }}>
+            <R6Icon size={17} stroke="rgba(255,255,255,.6)"><polyline points="18 15 12 9 6 15" /></R6Icon>
+          </span>
+        </button>
+      </div>
+
+      {queue && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 40, ...R7_SHEET }}>
+          <R6QueueSheet groups={groups} currentIdx={block.type === "rest" ? bIdx - 1 : bIdx} closedIds={finished ? [] : closedGroups}
+            onToggleGroup={(id) => setClosedGroups((c) => c.includes(id) ? c.filter((x) => x !== id) : [...c, id])}
+            onClose={() => { setQueue(false); setFinished(false); }} onReorder={setGroups} finish={finished} onFinish={onFinish} />
+        </div>
+      )}
+      {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={curName} /></div>}
+    </div>
+  );
+}
+function R6DragHandle() {
+  return (
+    <span style={{ display: "flex", flexShrink: 0, cursor: "grab", color: "var(--ff-text-3)" }} title="Arrastra para reordenar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" /><circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" /><circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" /></svg>
+    </span>
+  );
+}
+
+function R6Check({ done }) {
+  return done ? (
+    <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--ff-red)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <R6Icon size={12} stroke="#fff" w={3}><polyline points="20 6 9 17 4 12" /></R6Icon>
+    </span>
+  ) : (
+    <span style={{ width: 20, height: 20, borderRadius: "50%", border: "1.5px solid var(--ff-border)", flexShrink: 0 }} />
+  );
+}
+
+function R6SwapBtn({ onClick }) {
+  return (
+    <button onClick={onClick} title="Cambiar ejercicio" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", cursor: "pointer", flexShrink: 0 }}>
+      <R6Icon size={15} stroke="var(--ff-text-2)"><g><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></g></R6Icon>
+    </button>
+  );
+}
+
+window.TrainerImmersiveScreen = TrainerImmersiveScreen;
 
 // ── Summary.jsx ─────────────────────────────────────────────────
 // FitFighters mobile — Workout summary.
@@ -2052,18 +3199,16 @@ function StatCard({ label, value, sub }) {
 function SummaryScreen({ onHome, onMilestone }) {
   const s = window.FF_DATA.summary;
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Resumen">
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Resumen">
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 110 }}>
       {/* Hero */}
       <div style={{ position: "relative", height: 190, overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,#2a1410 0%,#161018 55%,#101a14 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,50,0,.12) 0%, rgba(255,154,60,.08) 55%, rgba(46,207,122,.07) 100%)" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(15,15,15,.2) 0%, var(--ff-bg) 100%)" }} />
-        <button onClick={onHome} style={{ position: "absolute", top: 16, left: 16, width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
-        </button>
+        <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}><CircleIconBtn kind="back" onClick={onHome} /></div>
         <div style={{ position: "absolute", bottom: 20, left: 20, right: 20 }}>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-2)", margin: "0 0 4px" }}>{s.program}</p>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", margin: 0 }}>{s.routine}</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: 0 }}>{s.routine}</h1>
         </div>
       </div>
 
@@ -2092,7 +3237,6 @@ function SummaryScreen({ onHome, onMilestone }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {s.rows.map((r, i) => {
-            const color = SECTION_TYPES[r.type].color;
             return (
               <div key={i} style={{ background: "var(--ff-surface)", borderRadius: 12, padding: "14px 16px", border: "1px solid var(--ff-border)", display: "flex", alignItems: "center", gap: 12 }}>
                 <SectionBadge type={r.type} showLabel={false} />
@@ -2101,7 +3245,7 @@ function SummaryScreen({ onHome, onMilestone }) {
                   <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-text)", margin: 0 }}>{r.name}</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, margin: 0, color: r.muted ? "var(--ff-text-3)" : color }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, margin: 0, color: r.muted ? "var(--ff-text-3)" : "var(--ff-text)" }}>
                     {r.value}{r.unit ? <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", fontWeight: 400 }}> {r.unit}</span> : null}
                   </p>
                   {r.sub ? <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "1px 0 0" }}>{r.sub}</p> : null}
@@ -2151,20 +3295,14 @@ function EPFieldRow({ label, value, onClick }) {
 }
 
 function EditProfileScreen({ onBack }) {
-  const SaveBtn = (
-    <button
-      onClick={onBack}
-      style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-red)", paddingRight: 8 }}
-    >
-      Guardar
-    </button>
-  );
-
+  const [scrolled, onScroll] = useBarScroll();
+  const [name, setName] = React.useState("Eduardo");
+  const [lastName, setLastName] = React.useState("García");
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Editar perfil">
-      <AppBar variant="title" title="Editar perfil" showBack onBack={onBack} trailing={SaveBtn} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Editar perfil">
+      <FloatingTopBar title="Editar perfil" onBack={onBack} scrolled={scrolled} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 40px" }}>
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "56px 16px 24px" }}>
         {/* Avatar */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px 0 28px" }}>
           <div style={{ position: "relative" }}>
@@ -2181,20 +3319,13 @@ function EditProfileScreen({ onBack }) {
         {/* Fields */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <EPFieldBlock label="Nombre">
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 500, color: "var(--ff-text)", margin: 0 }}>Eduardo</p>
-            </EPFieldBlock>
-            <EPFieldBlock label="Apellido">
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 500, color: "var(--ff-text)", margin: 0 }}>García</p>
-            </EPFieldBlock>
+            <WhiteField label="Nombre" value={name} onChange={setName} />
+            <WhiteField label="Apellido" value={lastName} onChange={setLastName} />
           </div>
 
-          <EPFieldBlock label="Correo electrónico" disabled>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: 0 }}>eduardo@gmail.com</p>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            </div>
-          </EPFieldBlock>
+          <div style={{ opacity: 0.55, pointerEvents: "none" }}>
+            <WhiteField label="Correo electrónico" value="eduardo@gmail.com" />
+          </div>
 
           <EPFieldRow label="Sexo" value="Masculino" onClick={() => {}} />
           <EPFieldRow label="Fecha de nacimiento" value="15 de febrero de 2008" onClick={() => {}} />
@@ -2204,6 +3335,9 @@ function EditProfileScreen({ onBack }) {
             <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.55, margin: 0 }}>El correo no se puede cambiar desde la app. Visita fitfighters.com para modificarlo.</p>
           </div>
         </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: "12px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" onClick={onBack}>Guardar cambios</Button>
       </div>
     </div>
   );
@@ -2215,6 +3349,7 @@ window.EditProfileScreen = EditProfileScreen;
 // FitFighters mobile — Change Password screen.
 
 function ChangePasswordScreen({ onBack, initialCurrent = "", initialNext = "", initialConfirm = "" }) {
+  const [scrolled, onScroll] = useBarScroll();
   const [current, setCurrent] = React.useState(initialCurrent);
   const [next, setNext] = React.useState(initialNext);
   const [confirm, setConfirm] = React.useState(initialConfirm);
@@ -2223,21 +3358,21 @@ function ChangePasswordScreen({ onBack, initialCurrent = "", initialNext = "", i
   const mismatch = confirm.length > 0 && next !== confirm;
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar contraseña">
-      <AppBar variant="title" title="Cambiar contraseña" showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Cambiar contraseña">
+      <FloatingTopBar title="Cambiar contraseña" onBack={onBack} scrolled={scrolled} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 110px" }}>
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "56px 16px 110px" }}>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-3)", lineHeight: 1.6, padding: "18px 0 24px" }}>
           Ingresa tu contraseña actual y luego elige una nueva. Usa al menos 8 caracteres.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <TextField label="Contraseña actual" value={current} onChange={setCurrent} password />
+          <WhiteField label="Contraseña actual" value={current} onChange={setCurrent} password />
 
           <div style={{ height: 6 }} />
 
-          <TextField label="Nueva contraseña" value={next} onChange={setNext} password />
-          <TextField
+          <WhiteField label="Nueva contraseña" value={next} onChange={setNext} password />
+          <WhiteField
             label="Confirmar nueva contraseña"
             value={confirm}
             onChange={setConfirm}
@@ -2280,21 +3415,19 @@ function ProgramDetailView({ program, onBack, onConfirm, plan = "subscribed" }) 
   };
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Detalle de plan">
       {/* Video thumbnail */}
       <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", background: "var(--ff-surface-2)", flexShrink: 0 }}>
         <img src={program.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,.5) 0%, transparent 50%)" }} />
-        <button onClick={onBack} style={{ position: "absolute", top: 12, left: 12, width: 40, height: 40, background: "rgba(0,0,0,.4)", borderRadius: "50%", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
+        <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}><CircleIconBtn kind="back" onClick={onBack} onMedia /></div>
         <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 52, height: 52, background: "rgba(255,50,0,.9)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid rgba(255,255,255,.2)" }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
         </div>
         <span style={{ position: "absolute", bottom: 10, left: 14, fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.7)", letterSpacing: ".06em" }}>Video explicativo</span>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 100px" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 16px 100px" }}>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: "0 0 6px", lineHeight: 1.3 }}>{program.name}</h1>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "0 0 12px" }}>{program.levels} niveles disponibles</p>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.65, margin: "0 0 24px" }}>{program.desc}</p>
@@ -2302,7 +3435,7 @@ function ProgramDetailView({ program, onBack, onConfirm, plan = "subscribed" }) 
         <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" }}>Elige un nivel</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(44px, 1fr))", gap: 8, marginBottom: isFree ? 10 : 24 }}>
           {unlockedLevels.map(l => (
-            <button key={l} onClick={() => setLevel(l)} style={{ padding: "10px 0", borderRadius: 10, border: "1px solid", borderColor: level === l ? "var(--ff-red)" : "var(--ff-border)", background: level === l ? "var(--ff-red)" : "var(--ff-surface)", color: level === l ? "#fff" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>{l}</button>
+            <button key={l} onClick={() => setLevel(l)} style={{ padding: "10px 0", borderRadius: 10, background: "var(--ff-surface)", border: level === l ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", color: level === l ? "var(--ff-red-light)" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: level === l ? 600 : 500, cursor: "pointer" }}>{l}</button>
           ))}
           {lockedLevels.map(l => (
             <button key={l} disabled style={{ padding: "10px 0", borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text-3)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "not-allowed", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, opacity: 0.55 }}>
@@ -2312,7 +3445,7 @@ function ProgramDetailView({ program, onBack, onConfirm, plan = "subscribed" }) 
           ))}
         </div>
         {isFree ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ff-action-info-bg)", border: "0.5px solid var(--ff-action-info-border)", borderRadius: 12, padding: "10px 12px", marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(80,130,220,.08)", border: "1px solid rgba(80,130,220,.25)", borderRadius: 12, padding: "10px 12px", marginBottom: 24 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5082DC" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
             <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0, lineHeight: 1.4 }}>Con el plan free solo tienes acceso al Nivel 0. Actualiza tu suscripción para desbloquear el resto.</p>
           </div>
@@ -2321,7 +3454,7 @@ function ProgramDetailView({ program, onBack, onConfirm, plan = "subscribed" }) 
         <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" }}>Días de entrenamiento</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {DAYS.map(d => (
-            <button key={d} onClick={() => toggleDay(d)} style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid", borderColor: days.has(d) ? "rgba(255,50,0,.35)" : "var(--ff-border)", background: days.has(d) ? "rgba(255,50,0,.12)" : "var(--ff-surface)", color: days.has(d) ? "var(--ff-red-light)" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "center" }}>{d}</button>
+            <O2Choice key={d} selected={days.has(d)} onClick={() => toggleDay(d)} height={48}>{d}</O2Choice>
           ))}
         </div>
       </div>
@@ -2335,6 +3468,7 @@ function ProgramDetailView({ program, onBack, onConfirm, plan = "subscribed" }) 
 
 // ── Change training days sub-view + scope confirm dialog ──────────────────────
 function ChangeDaysView({ onBack, onSave }) {
+  const [scrolled, onScroll] = useBarScroll();
   const [days, setDays] = React.useState(new Set(["Lunes", "Miércoles", "Viernes"]));
   const toggleDay = (d) => {
     const s = new Set(days);
@@ -2342,14 +3476,14 @@ function ChangeDaysView({ onBack, onSave }) {
     setDays(s);
   };
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar días de entrenamiento">
-      <AppBar variant="title" title="Días de entrenamiento" showBack onBack={onBack} />
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 100px" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Cambiar días de entrenamiento">
+      <FloatingTopBar title="Días de entrenamiento" onBack={onBack} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "64px 16px 100px" }}>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: "0 0 20px" }}>Elige los días en los que quieres entrenar. Puedes cambiarlos cuando quieras.</p>
         <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" }}>Días de entrenamiento</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {DAYS.map(d => (
-            <button key={d} onClick={() => toggleDay(d)} style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid", borderColor: days.has(d) ? "rgba(255,50,0,.35)" : "var(--ff-border)", background: days.has(d) ? "rgba(255,50,0,.12)" : "var(--ff-surface)", color: days.has(d) ? "var(--ff-red-light)" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "center" }}>{d}</button>
+            <O2Choice key={d} selected={days.has(d)} onClick={() => toggleDay(d)} height={48}>{d}</O2Choice>
           ))}
         </div>
       </div>
@@ -2362,7 +3496,7 @@ function ChangeDaysView({ onBack, onSave }) {
 
 function ScopeDialog({ onPick, onDismiss }) {
   return (
-    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "flex-end", zIndex: 20 }} onClick={onDismiss}>
+    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.35)", display: "flex", alignItems: "flex-end", zIndex: 20, ...APP_LIGHT }} onClick={onDismiss}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "20px 20px 0 0", padding: "22px 16px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--ff-border)", margin: "0 auto 4px" }} />
         <div>
@@ -2382,14 +3516,53 @@ function ScopeDialog({ onPick, onDismiss }) {
   );
 }
 
+// Los filtros salen de la lista y viven en una hoja inferior.
+function PlanFilterSheet({ level, place, onLevel, onPlace, onClose }) {
+  const rowLabel = { fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" };
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: 22 }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", cursor: "pointer" }}>
+          <span style={{ width: 38, height: 4, borderRadius: 2, background: "var(--ff-border)" }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", margin: 0, letterSpacing: "-.2px" }}>Filtrar planes</p>
+          <button onClick={() => { onLevel("all"); onPlace("all"); }} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-red-light)" }}>Limpiar</button>
+        </div>
+        <div>
+          <p style={rowLabel}>Nivel</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[["all", "Todos"], ["fundamentos", "Fundamentos"], ["principiante", "Principiante"], ["avanzado", "Avanzado"]].map(([k, l]) => (
+              <PlanFilterChip key={k} selected={level === k} onClick={() => onLevel(k)}>{l}</PlanFilterChip>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p style={rowLabel}>Lugar de entrenamiento</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["all", "Todos"], ["gym", "Gym"], ["home", "Casa"]].map(([k, l]) => (
+              <PlanFilterChip key={k} selected={place === k} onClick={() => onPlace(k)}>{l}</PlanFilterChip>
+            ))}
+          </div>
+        </div>
+        <Button variant="primary" fullWidth onClick={onClose}>Ver planes</Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Program list main view ─────────────────────────────────────────────────────
-function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialSelectedId = null, plan = "subscribed", initialScopeDialogOpen = false }) {
+function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialSelectedId = null, plan = "subscribed", initialScopeDialogOpen = false, initialFilterOpen = false }) {
+  const [scrolled, onScroll] = useBarScroll();
   const programs = window.FF_DATA.programs;
   const [view, setView] = React.useState(initialView);
   const [selected, setSelected] = React.useState(initialSelectedId ? programs.find(p => p.id === initialSelectedId) || null : null);
   const [placeFilter, setPlaceFilter] = React.useState("all");
   const [levelFilter, setLevelFilter] = React.useState("all");
   const [scopeDialogOpen, setScopeDialogOpen] = React.useState(initialScopeDialogOpen);
+  const [filterOpen, setFilterOpen] = React.useState(initialFilterOpen);
+  const activeFilters = (levelFilter !== "all" ? 1 : 0) + (placeFilter !== "all" ? 1 : 0);
 
   if (view === "changeDays") {
     return (
@@ -2412,10 +3585,10 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
   const visible = programs.filter(p => (placeFilter === "all" || p.category === placeFilter) && (levelFilter === "all" || p.levelTag === levelFilter));
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Cambiar plan">
-      <AppBar variant="title" title="Cambiar plan" showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Cambiar plan">
+      <FloatingTopBar title="Cambiar plan" onBack={onBack} scrolled={scrolled} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 32px" }}>
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "56px 16px 32px" }}>
         {/* Current plan */}
         <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "8px 0 10px" }}>Plan actual</p>
         <div style={{ background: "var(--ff-surface)", borderRadius: 16, border: "1px solid var(--ff-red)", overflow: "hidden", marginBottom: 24 }}>
@@ -2439,23 +3612,14 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
           </div>
         </div>
 
-        {/* Nivel + lugar de entrenamiento */}
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 10px" }}>Planes disponibles</p>
-        <div style={{ marginBottom: 12 }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "0 0 8px" }}>Nivel</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {[["all", "Todos"], ["fundamentos", "Fundamentos"], ["principiante", "Principiante"], ["avanzado", "Avanzado"]].map(([k, l]) => (
-              <Chip key={k} selected={levelFilter === k} onClick={() => setLevelFilter(k)}>{l}</Chip>
-            ))}
-          </div>
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "0 0 8px" }}>Lugar de entrenamiento</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[["all", "Todos"], ["gym", "Gym"], ["home", "Casa"]].map(([k, l]) => (
-              <Chip key={k} selected={placeFilter === k} onClick={() => setPlaceFilter(k)}>{l}</Chip>
-            ))}
-          </div>
+        {/* Planes disponibles + filtro en hoja inferior */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: 0 }}>Planes disponibles</p>
+          <button onClick={() => setFilterOpen(true)} style={{ display: "flex", alignItems: "center", gap: 7, height: 36, padding: "0 14px", borderRadius: 999, cursor: "pointer", background: "var(--ff-surface)",
+            border: activeFilters ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", color: activeFilters ? "var(--ff-red-light)" : "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="7" x2="20" y2="7" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="17" x2="14" y2="17" /></svg>
+            Filtrar{activeFilters ? ` · ${activeFilters}` : ""}
+          </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2476,6 +3640,9 @@ function ChangeProgramScreen({ onBack, onConfirm, initialView = "list", initialS
           ))}
         </div>
       </div>
+      {filterOpen && (
+        <PlanFilterSheet level={levelFilter} place={placeFilter} onLevel={setLevelFilter} onPlace={setPlaceFilter} onClose={() => setFilterOpen(false)} />
+      )}
     </div>
   );
 }
@@ -2522,11 +3689,12 @@ function StatusPill({ yes }) {
 
 // ── Generation Detail ──────────────────────────────────────────────────────────
 function GenerationDetailView({ gen, onBack }) {
+  const [scrolled, onScroll] = useBarScroll();
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }}>
-      <AppBar variant="title" title={gen.name} showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Detalle de generación">
+      <FloatingTopBar title={gen.name} onBack={onBack} scrolled={scrolled} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 32px" }}>
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "60px 16px 32px" }}>
         {/* Hero card */}
         <div style={{ background: "var(--ff-surface)", borderRadius: 20, border: "1px solid var(--ff-border)", padding: "20px 16px", display: "flex", alignItems: "center", gap: 16, marginBottom: 4 }}>
           <div style={{ width: 72, height: 72, borderRadius: 14, background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -2559,6 +3727,7 @@ function GenerationDetailView({ gen, onBack }) {
 
 // ── Generation History list ────────────────────────────────────────────────────
 function GenerationHistoryScreen({ onBack, generationsOverride = null, initialSelectedId = "__none__" }) {
+  const [scrolled, onScroll] = useBarScroll();
   const generations = generationsOverride !== null ? generationsOverride : window.FF_DATA.generations;
   const [selected, setSelected] = React.useState(
     initialSelectedId === "__none__" ? null : generations.find(g => g.id === initialSelectedId) || null
@@ -2569,10 +3738,10 @@ function GenerationHistoryScreen({ onBack, generationsOverride = null, initialSe
   }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Generaciones">
-      <AppBar variant="title" title="Generaciones" showBack onBack={onBack} />
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Generaciones">
+      <FloatingTopBar title="Generaciones" onBack={onBack} scrolled={scrolled} />
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingTop: 56 }}>
         {generations.length === 0 ? (
           // Empty state
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
@@ -2624,7 +3793,7 @@ function MilestoneScreen({ onClose, initialShareOpen = false }) {
   ];
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)", position: "relative", borderRadius: "26px 26px 0 0", overflow: "hidden" }} data-screen-label="Logro">
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT, position: "relative", borderRadius: "26px 26px 0 0", overflow: "hidden" }} data-screen-label="Logro">
       {/* Drag handle — this is a bottom sheet over the previous screen */}
       <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 2px", flexShrink: 0 }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--ff-surface-2)" }} />
@@ -2640,7 +3809,7 @@ function MilestoneScreen({ onClose, initialShareOpen = false }) {
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ background: "var(--ff-action-danger-bg)", border: "0.5px solid var(--ff-action-danger-border)", borderRadius: 999, padding: "5px 16px", marginBottom: 18 }}>
+        <div style={{ background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", borderRadius: 999, padding: "5px 16px", marginBottom: 18 }}>
           <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-red-light)" }}>Nivel {m.currentLevel} de {m.totalLevels}</span>
         </div>
 
@@ -2775,13 +3944,16 @@ function App() {
   let body;
   switch (screen) {
     case "login":
-      body = <LoginScreen onLogin={nav.login} onRegister={nav.register} />;
+      body = <LoginChoiceScreen onLogin={() => setScreen("loginEmail")} onRegister={nav.register} />;
+      break;
+    case "loginEmail":
+      body = <LoginEmailScreen onLogin={nav.login} onBack={() => setScreen("login")} onRegister={nav.register} />;
       break;
     case "register":
       body = <RegisterScreen onBack={() => setScreen("login")} onRegister={nav.onboarding} />;
       break;
     case "onboarding":
-      body = <OnboardingScreen onBack={() => setScreen("register")} onComplete={nav.recommended} />;
+      body = <O2Onboarding onBack={() => setScreen("register")} onComplete={nav.recommended} />;
       break;
     case "recommended":
       body = <RecommendedProgramScreen onContinue={nav.workout} />;
@@ -2799,7 +3971,7 @@ function App() {
       body = <ChangeExerciseScreen exercise={activeExercise?.ex} onBack={() => setScreen("exerciseDetail")} onConfirm={onExerciseChanged} />;
       break;
     case "profile":
-      body = <ProfileScreen tab={tab} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} onGenerations={nav.generationHistory} />;
+      body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} onGenerations={nav.generationHistory} />;
       break;
     case "editProfile":
       body = <EditProfileScreen onBack={nav.profile} />;
@@ -2814,7 +3986,7 @@ function App() {
       body = <GenerationHistoryScreen onBack={nav.profile} />;
       break;
     case "trainer":
-      body = <TrainerScreen onExit={nav.workout} onFinish={nav.summary} />;
+      body = <TrainerImmersiveScreen live onExit={nav.workout} onFinish={nav.summary} />;
       break;
     case "summary":
       body = <SummaryScreen onHome={nav.workout} onMilestone={nav.milestone} />;
@@ -2823,7 +3995,7 @@ function App() {
       body = <MilestoneScreen onClose={nav.workout} />;
       break;
     default:
-      body = <LoginScreen onLogin={nav.login} />;
+      body = <LoginChoiceScreen onLogin={() => setScreen("loginEmail")} onRegister={nav.register} />;
   }
 
   return (
@@ -2883,37 +4055,42 @@ function Catalog() {
     {
       title: "Autenticación",
       cells: [
-        { label: "Login", el: <LoginScreen onLogin={noop} onRegister={noop} /> },
+        { label: "Login · portada", el: <LoginChoiceScreen onLogin={noop} onRegister={noop} /> },
+        { label: "Login · correo", el: <LoginEmailScreen onLogin={noop} onBack={noop} onRegister={noop} /> },
         { label: "Registro", el: <RegisterScreen onBack={noop} onRegister={noop} /> },
       ],
     },
     {
       title: "Onboarding",
       cells: [
-        { label: "Datos personales", el: <OnboardingScreen initialStep={0} onBack={noop} onComplete={noop} /> },
-        { label: "Datos personales", note: "Medidas fuera de rango", el: <OnboardingScreen initialStep={0} initialHeight="95" initialWeight="15" onBack={noop} onComplete={noop} /> },
-        { label: "Nivel de experiencia", el: <OnboardingScreen initialStep={1} onBack={noop} onComplete={noop} /> },
-        { label: "Grupos musculares", el: <OnboardingScreen initialStep={2} initialExperienceLevel="advanced" onBack={noop} onComplete={noop} /> },
-        { label: "Objetivo", el: <OnboardingScreen initialStep={2} onBack={noop} onComplete={noop} /> },
-        { label: "Lugar de entrenamiento", el: <OnboardingScreen initialStep={3} onBack={noop} onComplete={noop} /> },
-        { label: "Días de entrenamiento", el: <OnboardingScreen initialStep={4} onBack={noop} onComplete={noop} /> },
+        { label: "Datos personales", note: "Fecha de nacimiento y género", el: <O2Onboarding step={0} onBack={noop} onComplete={noop} /> },
+        { label: "Medidas", note: "Altura, peso y sistema de unidades", el: <O2Onboarding step={1} onBack={noop} onComplete={noop} /> },
+        { label: "Medidas", note: "Fuera de rango · el paso queda bloqueado", el: <O2Onboarding step={1} seedHeight="95" seedWeight="15" onBack={noop} onComplete={noop} /> },
+        { label: "Nivel de experiencia", el: <O2Onboarding step={2} onBack={noop} onComplete={noop} /> },
+        { label: "Grupos musculares", note: "Solo con más de 2 años entrenando", el: <O2Onboarding step={3} onBack={noop} onComplete={noop} /> },
+        { label: "Objetivo", el: <O2Onboarding step={4} onBack={noop} onComplete={noop} /> },
+        { label: "Lugar de entrenamiento", el: <O2Onboarding step={5} onBack={noop} onComplete={noop} /> },
+        { label: "Lugar de entrenamiento", note: "Casa · nota de mancuernas", el: <O2Onboarding step={5} seedPlace="Casa" onBack={noop} onComplete={noop} /> },
+        { label: "Días de entrenamiento", el: <O2Onboarding step={6} onBack={noop} onComplete={noop} /> },
         { label: "Programa recomendado", el: <RecommendedProgramScreen onContinue={noop} /> },
       ],
     },
     {
       title: "Workout (inicio)",
       cells: [
-        { label: "Rutina semanal", note: "statusAction: none", el: <WorkoutScreen bannerVariant="none" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: tutorial", el: <WorkoutScreen bannerVariant="tutorial" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: preload", el: <WorkoutScreen bannerVariant="preload" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: has_credits", el: <WorkoutScreen bannerVariant="has_credits" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: load_program", el: <WorkoutScreen bannerVariant="load_program" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: last_week", el: <WorkoutScreen bannerVariant="last_week" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: invitation", el: <WorkoutScreen bannerVariant="invitation" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: ready_available", el: <WorkoutScreen bannerVariant="ready_available" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: ready_unavailable", el: <WorkoutScreen bannerVariant="ready_unavailable" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: future_subscription", el: <WorkoutScreen bannerVariant="future_subscription" tab="workout" onTab={noop} onSelectDay={noop} /> },
-        { label: "Rutina semanal", note: "statusAction: select_next_program", el: <WorkoutScreen bannerVariant="select_next_program" tab="workout" onTab={noop} onSelectDay={noop} /> },
+        { label: "Workout", note: "Hoy con rutina", el: <WorkoutListScreen onSelectDay={noop} /> },
+        { label: "Workout", note: "Hoy es descanso", el: <WorkoutListScreen onSelectDay={noop} todayRest /> },
+        { label: "Workout", note: "Selector de semana abierto", el: <WorkoutListScreen onSelectDay={noop} sheetOpen /> },
+        { label: "Workout", note: "Viendo otra semana", el: <WorkoutListScreen onSelectDay={noop} initialWeek={4} /> },
+        { label: "Workout", note: "Sin plan cargado", el: <WorkoutEmptyScreen onStartTutorial={noop} /> },
+        { label: "Rutinas anteriores", note: "Completadas y pendientes", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} /> },
+      ],
+    },
+    {
+      title: "Tutorial",
+      cells: [
+        { label: "Tutorial", note: "Usuario nuevo", el: <TutorialSheetScreen onStart={noop} onClose={noop} /> },
+        { label: "Tutorial", note: "Usuario que regresa", el: <TutorialSheetScreen onStart={noop} onClose={noop} returning /> },
       ],
     },
     {
@@ -2935,21 +4112,20 @@ function Catalog() {
     {
       title: "Entrenador virtual",
       cells: [
-        { label: "Cycle", el: <TrainerScreen initialBlockIndex={0} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Cycle por tiempo", el: <TrainerScreen initialBlockIndex={9} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Cycle al fallo", note: "casa · backend envía reps 0 y tiempo 0", el: <TrainerScreen initialBlockIndex={10} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Stripset", el: <TrainerScreen initialBlockIndex={2} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "For time", el: <TrainerScreen initialBlockIndex={3} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "AMRAP", el: <TrainerScreen initialBlockIndex={4} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "EMOM", el: <TrainerScreen initialBlockIndex={5} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Cardio tradicional", el: <TrainerScreen initialBlockIndex={6} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Cardio intervalos", el: <TrainerScreen initialBlockIndex={7} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Descanso entre secciones", el: <TrainerScreen initialBlockIndex={1} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Descanso entre ejercicios", note: "overlay dentro de Cycle/Stripset/Cardio", el: <TrainerScreen initialBlockIndex={0} lockBlock demoInterRest onExit={noop} onFinish={noop} /> },
-        { label: "Prepárate", note: "modal 3-2-1 al iniciar sección o al reanudar", el: <TrainerScreen initialBlockIndex={0} lockBlock holdPreroll onExit={noop} onFinish={noop} /> },
-        { label: "En pausa", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Cola", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} initialPauseTab="cola" lockBlock onExit={noop} onFinish={noop} /> },
-        { label: "Instrucciones", el: <TrainerScreen initialBlockIndex={0} initialPaused={true} initialPauseTab="instrucciones" lockBlock onExit={noop} onFinish={noop} /> },
+        { label: "Cycle", note: "Anillo partido por serie; el color de sección tiñe anillo y etiqueta", el: <TrainerImmersiveScreen blockIdx={0} /> },
+        { label: "Cycle por tiempo", note: "Sigue rigiéndose por series: el anillo no cambia", el: <TrainerImmersiveScreen blockIdx={9} /> },
+        { label: "Stripset", el: <TrainerImmersiveScreen blockIdx={2} /> },
+        { label: "For time", note: "Un arco por ronda; el cronómetro sube dentro del anillo", el: <TrainerImmersiveScreen blockIdx={3} /> },
+        { label: "AMRAP", note: "El anillo se completa conforme baja el restante del bloque", el: <TrainerImmersiveScreen blockIdx={4} /> },
+        { label: "EMOM", note: "El anillo reinicia cada minuto", el: <TrainerImmersiveScreen blockIdx={5} /> },
+        { label: "Cardio tradicional", note: "Anillo sobre el tiempo total del cardio", el: <TrainerImmersiveScreen blockIdx={6} /> },
+        { label: "Cardio intervalos", el: <TrainerImmersiveScreen blockIdx={7} /> },
+        { label: "Descanso", note: "Video desaturado y anillo gris de descanso", el: <TrainerImmersiveScreen blockIdx={1} /> },
+        { label: "En pausa", el: <TrainerImmersiveScreen blockIdx={0} paused /> },
+        { label: "Cola", note: "Cola por secciones sobre fondo oscuro sólido", el: <TrainerImmersiveScreen blockIdx={2} queueOpen /> },
+        { label: "Prepárate", note: "modal 3-2-1 al iniciar sección o al reanudar", el: <TrainerImmersiveScreen blockIdx={0} showPreroll /> },
+        { label: "Último ejercicio", note: "La card de abajo pasa a 'Finalizar entrenamiento'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} /> },
+        { label: "Rutina completa", note: "Al dar siguiente o acabar el tiempo: cola desplegada y 'Finalizar rutina'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} finishOpen /> },
       ],
     },
     {
@@ -2963,7 +4139,7 @@ function Catalog() {
     {
       title: "Perfil y cuenta",
       cells: [
-        { label: "Perfil", el: <ProfileScreen tab="profile" onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
+        { label: "Perfil", note: "Modal de abajo hacia arriba: cierre a la derecha", el: <ProfileScreen tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
         { label: "Editar perfil", el: <EditProfileScreen onBack={noop} /> },
         { label: "Cambiar contraseña", el: <ChangePasswordScreen onBack={noop} /> },
         { label: "Cambiar contraseña", note: "Error de validación", el: <ChangePasswordScreen initialCurrent="FitFighters1" initialNext="NuevaClave1" initialConfirm="NuevaClave2" onBack={noop} /> },
@@ -2973,7 +4149,8 @@ function Catalog() {
       title: "Planes",
       cells: [
         { label: "Cambiar plan", note: "Lista", el: <ChangeProgramScreen initialView="list" onBack={noop} onConfirm={noop} /> },
-        { label: "Cambiar días de entrenamiento", note: "Con di\u00e1logo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar plan", note: "Filtros en hoja inferior", el: <ChangeProgramScreen initialView="list" initialFilterOpen onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar días de entrenamiento", note: "Con diálogo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Suscrito", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Plan free", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} plan="free" onBack={noop} onConfirm={noop} /> },
       ],
