@@ -182,6 +182,33 @@ function RegisterScreen({ onBack, onRegister }) {
 }
 
 
+// Registro · confirmación. Estado terminal claro: la cuenta existe pero falta
+// confirmar el correo, así que el CTA lleva al buzón y el acceso queda secundario.
+function RegisterDoneScreen({ email = "eduardo@gmail.com", onLogin }) {
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Registro · cuenta creada">
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 28px 8px", textAlign: "center" }}>
+        <div style={{ width: 76, height: 76, borderRadius: "50%", background: "rgba(46,207,122,0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 26 }}>
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1FA860" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 12.5 9.5 18 20 6.5" /></svg>
+        </div>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "0 0 10px" }}>Cuenta creada</h1>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0, maxWidth: 268 }}>Tu cuenta se creó correctamente. Confirma tu correo para poder iniciar sesión.</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 24, padding: "12px 16px", borderRadius: 12, background: "var(--ff-surface)", border: "1px solid var(--ff-border)" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><polyline points="3 7 12 13 21 7" /></svg>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--ff-text)" }}>{email}</span>
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: "12px 20px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" fullWidth onClick={onLogin}>Abrir mi correo</Button>
+        <p style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "16px 0 0" }}>
+          <span onClick={onLogin} style={{ color: "var(--ff-red-light)", fontWeight: 600, cursor: "pointer" }}>Ya lo confirmé · iniciar sesión</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
 window.LoginScreen = LoginChoiceScreen;
 window.LoginEmailScreen = LoginEmailScreen;
 window.RegisterScreen = RegisterScreen;
@@ -3903,9 +3930,11 @@ function App() {
   const [selectedDay, setSelectedDay] = React.useState(null);
   const [blocks, setBlocks] = React.useState(() => JSON.parse(JSON.stringify(window.FF_DATA.routineDetailBlocks || [])));
   const [activeExercise, setActiveExercise] = React.useState(null); // { ex, blockIndex }
+  // Usuario recién registrado: al iniciar sesión entra al onboarding, no al workout.
+  const [isNewUser, setIsNewUser] = React.useState(false);
 
   const nav = {
-    login:             () => { setTab("workout"); setScreen("workout"); },
+    login:             () => { if (isNewUser) { setIsNewUser(false); setScreen("onboarding"); return; } setTab("workout"); setScreen("workout"); },
     register:          () => setScreen("register"),
     onboarding:        () => setScreen("onboarding"),
     recommended:       () => setScreen("recommended"),
@@ -3950,7 +3979,10 @@ function App() {
       body = <LoginEmailScreen onLogin={nav.login} onBack={() => setScreen("login")} onRegister={nav.register} />;
       break;
     case "register":
-      body = <RegisterScreen onBack={() => setScreen("login")} onRegister={nav.onboarding} />;
+      body = <RegisterScreen onBack={() => setScreen("login")} onRegister={() => { setIsNewUser(true); setScreen("registerDone"); }} />;
+      break;
+    case "registerDone":
+      body = <RegisterDoneScreen onLogin={() => setScreen("loginEmail")} />;
       break;
     case "onboarding":
       body = <O2Onboarding onBack={() => setScreen("register")} onComplete={nav.recommended} />;
@@ -4058,6 +4090,7 @@ function Catalog() {
         { label: "Login · portada", el: <LoginChoiceScreen onLogin={noop} onRegister={noop} /> },
         { label: "Login · correo", el: <LoginEmailScreen onLogin={noop} onBack={noop} onRegister={noop} /> },
         { label: "Registro", el: <RegisterScreen onBack={noop} onRegister={noop} /> },
+        { label: "Registro · cuenta creada", el: <RegisterDoneScreen onLogin={noop} /> },
       ],
     },
     {
