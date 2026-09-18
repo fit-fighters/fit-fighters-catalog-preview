@@ -1182,7 +1182,7 @@ function TwoTabBar({ active = "workout", onChange }) {
   );
 }
 
-function PendingRow({ onOpen }) {
+function PendingRow({ onOpen, note }) {
   return (
     <button onClick={onOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
       <span style={{ width: 34, height: 34, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
@@ -1190,7 +1190,7 @@ function PendingRow({ onOpen }) {
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)" }}>Rutinas anteriores</span>
-        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>Completadas y pendientes de tu plan</span>
+        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>{note || "Completadas y pendientes de tu plan"}</span>
       </span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
     </button>
@@ -1320,7 +1320,7 @@ function WeekPill({ week, onClick }) {
   );
 }
 
-function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
+function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, sheetOpen }) {
   const p = window.FF_DATA.program;
   const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter(b => b.type !== "rest").length;
   const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
@@ -1328,16 +1328,17 @@ function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
   const todayIdx = Math.max(0, template.findIndex(x => x.status === "today"));
   // Solo las rutinas por realizar, de hoy en adelante, con su fecha real.
   const upcoming = [];
-  for (let offset = todayRest ? 1 : 0; upcoming.length < 6 && offset < 21; offset++) {
+  for (let offset = (todayRest || todayDone) ? 1 : 0; upcoming.length < 6 && offset < 21; offset++) {
     const i = todayIdx + offset;
     const item = template[i % template.length];
     if (item.type === "rest") continue;
     upcoming.push({ ...item, date: formatShortDate(p.weekStartDate, i), status: offset === 0 ? "today" : "upcoming" });
   }
   const first = upcoming[0];
-  const rest = todayRest ? upcoming : upcoming.slice(1);
+  const rest = (todayRest || todayDone) ? upcoming : upcoming.slice(1);
   const todayDate = formatShortDate(p.weekStartDate, todayIdx);
   const todayName = (template[todayIdx] || {}).day;
+  const doneRoutine = ((template[todayIdx] || {}).routine) || (first && first.routine);
   const [week, setWeek] = React.useState(initialWeek || p.week);
   const [sheet, setSheet] = React.useState(!!sheetOpen);
   const isCurrent = week === p.week;
@@ -1346,7 +1347,7 @@ function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
     .map((item, i) => ({ ...item, date: formatShortDate(p.weekStartDate, (week - p.week) * 7 + i) }))
     .filter(x => x.type !== "rest");
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Workout W5">
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label={todayDone ? "Workout W5 · hoy completado" : "Workout W5"}>
       <header style={{ display: "flex", alignItems: "center", height: 56, padding: "0 16px", flexShrink: 0 }}>
         <InitialsAvatar />
       </header>
@@ -1355,7 +1356,7 @@ function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
           <ProgramHeaderFlat />
         </div>
         <div style={{ marginBottom: 18 }}>
-          <PendingRow onOpen={() => {}} />
+          <PendingRow onOpen={() => {}} note={todayDone && isCurrent ? "La rutina de hoy ya está guardada aquí" : undefined} />
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 2px 10px" }}>
           <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0 }}>{isCurrent ? "Hoy" : "Próximas rutinas"}</p>
@@ -1368,6 +1369,23 @@ function WorkoutListScreen({ onSelectDay, todayRest, initialWeek, sheetOpen }) {
               {weekRoutines.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
               <button onClick={() => setWeek(p.week)} style={{ marginTop: 4, height: 44, borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Volver a la semana actual</button>
             </React.Fragment>
+          ) : todayDone ? (
+            <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <img src="assets/entrenamiento_completado.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.90) 100%)" }} />
+              <div style={{ position: "relative", padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <div>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 24, padding: "0 10px", borderRadius: 999, background: "rgba(46,207,122,0.18)", border: "1px solid rgba(46,207,122,0.35)", marginBottom: 10 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 10.5, fontWeight: 700, color: "var(--ff-green)", textTransform: "uppercase", letterSpacing: ".12em" }}>Completada</span>
+                  </span>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>Hoy · {todayName} {todayDate}</p>
+                  <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", letterSpacing: "-.3px", lineHeight: 1.2, margin: "0 0 8px" }}>Terminaste tu entrenamiento de hoy</h2>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.80)", lineHeight: 1.6, margin: 0, maxWidth: 280 }}>{doneRoutine} queda guardada en tus rutinas anteriores. Hidrátate, come bien y descansa.</p>
+                </div>
+                <button onClick={() => {}} style={{ width: "100%", height: 48, borderRadius: 10, border: "1px solid rgba(255,255,255,0.35)", background: "rgba(255,255,255,0.08)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer" }}>Ver resumen</button>
+              </div>
+            </div>
           ) : todayRest ? (
             <div style={{ position: "relative", minHeight: 200, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <img src="assets/rest.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "saturate(0.55)" }} />
@@ -4112,6 +4130,7 @@ function Catalog() {
       title: "Workout (inicio)",
       cells: [
         { label: "Workout", note: "Hoy con rutina", el: <WorkoutListScreen onSelectDay={noop} /> },
+        { label: "Workout", note: "Hoy ya entrenado", el: <WorkoutListScreen onSelectDay={noop} todayDone /> },
         { label: "Workout", note: "Hoy es descanso", el: <WorkoutListScreen onSelectDay={noop} todayRest /> },
         { label: "Workout", note: "Selector de semana abierto", el: <WorkoutListScreen onSelectDay={noop} sheetOpen /> },
         { label: "Workout", note: "Viendo otra semana", el: <WorkoutListScreen onSelectDay={noop} initialWeek={4} /> },
