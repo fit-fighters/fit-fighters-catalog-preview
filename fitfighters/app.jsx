@@ -1214,20 +1214,43 @@ function RoutineListItem({ item, mins, blocks, onOpen }) {
 
 // Vista aparte "Rutinas anteriores": un filtro entre pendientes y completadas.
 // El progreso de una rutina no se guarda: solo se marca hecha o pendiente.
-function PastRoutinesScreen({ onBack, onSelectDay }) {
+function PastRoutinesScreen({ onBack, onSelectDay, demoMenu, demoSnack, initialFilter, demoUndone, todayDone }) {
   const p = window.FF_DATA.program;
   const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter(b => b.type !== "rest").length;
   const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
   const template = (window.FF_DATA.weekTemplate || []).filter(x => x.type !== "rest");
-  const [filter, setFilter] = React.useState("done");
+  const [filter, setFilter] = React.useState(initialFilter || "done");
+  // Desmarcar: una rutina completada vuelve a pendiente en un toque, con opción de
+  // deshacer desde el snackbar. No hay diálogo de confirmación. Si la desmarcada es
+  // la de hoy, vuelve a ser el hero de Workout.
+  const [undone, setUndone] = React.useState(demoUndone ? { "auto": true } : {});
+  const [menuItem, setMenuItem] = React.useState(demoMenu ? "auto" : null);
+  const [snack, setSnack] = React.useState(demoSnack ? { routine: "Fuerza de tren superior" } : null);
+  const keyOf = (x) => x.week + "-" + x.date;
   // Cada rutina anterior guarda la semana del plan a la que pertenece.
   const past = (offsets) => offsets.map((off, i) => {
     const item = template[i % template.length];
     return { ...item, date: formatShortDate(p.weekStartDate, off), week: p.week + Math.floor(off / 7) };
   });
   const pending = past([-9, -6, -2]);
-  const done = past([-14, -12, -9, -5, -3]);
-  const list = filter === "pending" ? pending : done;
+  const week0 = window.FF_DATA.weekTemplate || [];
+  const todayIdx = Math.max(0, week0.findIndex(x => x.status === "today"));
+  const todayItem = { ...(week0[todayIdx] || template[0]), date: formatShortDate(p.weekStartDate, todayIdx), week: p.week, isToday: true };
+  const done = (todayDone ? [todayItem] : []).concat(past([-14, -12, -9, -5, -3]));
+  const isUndone = (x) => undone[keyOf(x)] || (undone.auto && x === done[0]);
+  const doneList = done.filter(x => !isUndone(x));
+  const pendingList = pending.concat(done.filter(isUndone));
+  const list = filter === "pending" ? pendingList : doneList;
+  const menuTarget = menuItem === "auto" ? doneList[0] : menuItem;
+  const unmark = (item) => {
+    setUndone(prev => ({ ...prev, [keyOf(item)]: true }));
+    setMenuItem(null);
+    setSnack({ routine: item.routine, key: keyOf(item), isToday: !!item.isToday });
+  };
+  const undoUnmark = () => {
+    setSnack(null);
+    if (snack && snack.key) setUndone(prev => { const next = { ...prev }; delete next[snack.key]; return next; });
+  };
   // Agrupadas por semana, de la más reciente a la más antigua.
   const groups = [];
   list.slice().sort((a, b) => b.week - a.week).forEach((item) => {
@@ -1264,16 +1287,21 @@ function PastRoutinesScreen({ onBack, onSelectDay }) {
             <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14 }}>
               <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ width: 66, height: 66, borderRadius: 10, objectFit: "cover", flexShrink: 0, filter: filter === "done" ? "saturate(0.85)" : "saturate(0.6)" }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>{item.day} · {item.date}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: item.isToday ? "var(--ff-red-light)" : "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>{item.isToday ? "Hoy" : item.day} · {item.date}</p>
                 <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.routine}</p>
                 <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>{mins} min · {blockCount} bloques</p>
               </div>
               {filter === "pending" ? (
                 <button onClick={() => onSelectDay && onSelectDay(item)} style={{ flexShrink: 0, height: 36, padding: "0 14px", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>Hacer rutina</button>
               ) : (
-                <span style={{ flexShrink: 0, width: 28, height: 28, marginRight: 4, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(46,207,122,0.12)" }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                </span>
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 2 }}>
+                  <span style={{ width: 28, height: 28, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(46,207,122,0.12)" }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ff-green)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </span>
+                  <button type="button" aria-label="Más opciones" onClick={() => setMenuItem(item)} style={{ width: 32, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--ff-text-3)"><circle cx="12" cy="5" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="12" cy="19" r="1.7" /></svg>
+                  </button>
+                </div>
               )}
             </div>
             ))}
@@ -1281,6 +1309,36 @@ function PastRoutinesScreen({ onBack, onSelectDay }) {
           ))}
         </div>
       </div>
+      {menuTarget && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div onClick={() => setMenuItem(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+          <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 0 22px" }}>
+            <div style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)", margin: "0 auto 14px" }} />
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 20px 2px" }}>{menuTarget.routine}</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 12.5, color: "var(--ff-text-2)", margin: "0 20px 12px" }}>{menuTarget.day} · {menuTarget.date} · Semana {menuTarget.week}</p>
+            <button type="button" onClick={() => unmark(menuTarget)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "15px 20px", background: "none", border: "none", borderTop: "1px solid var(--ff-border)", cursor: "pointer", textAlign: "left" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><polyline points="3 3 3 8 8 8" /></svg>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)" }}>Marcar como pendiente</span>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>{menuTarget.isToday ? "Vuelve a ser tu rutina de hoy" : "Vuelve a tu lista de pendientes"}</span>
+              </span>
+            </button>
+            <button type="button" onClick={() => { setMenuItem(null); onSelectDay && onSelectDay(menuTarget); }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "15px 20px", background: "none", border: "none", borderTop: "1px solid var(--ff-border)", cursor: "pointer", textAlign: "left" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="6 4 20 12 6 20 6 4" /></svg>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)" }}>Repetir rutina</span>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>Entrénala otra vez sin cambiar tu plan</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+      {snack && (
+        <div style={{ position: "absolute", left: 16, right: 16, bottom: 18, zIndex: 20, display: "flex", alignItems: "center", gap: 12, padding: "13px 14px 13px 16px", background: "var(--ff-surface-2)", border: "1px solid var(--ff-border)", borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,0.5)" }}>
+          <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.4, margin: 0 }}>{snack.isToday ? snack.routine + " vuelve a ser tu rutina de hoy." : snack.routine + " volvió a pendientes."}</p>
+          <button type="button" onClick={undoUnmark} style={{ flexShrink: 0, height: 32, padding: "0 12px", borderRadius: 999, border: "none", background: "none", color: "var(--ff-red-light)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Deshacer</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2997,8 +3055,12 @@ function R7Stat({ value, label }) {
   );
 }
 
-function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, onExit, onFinish }) {
+function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish }) {
   const blocks = window.FF_DATA.trainerBlocks || [];
+  // EMOM: un solo ejercicio que se repite cada minuto. No hay pasos que saltar, así que
+  // atrás/siguiente se retiran y en su lugar queda una acción explícita de finalizar sección.
+  const isEmom = (blocks[blockIdx] || {}).type === "emom";
+  const [intro, setIntro] = React.useState(() => emomIntro || (live && isEmom));
   const [bIdx] = React.useState(blockIdx);
   const [sIdx, setSIdx] = React.useState(stepIdx);
   const [isPaused, setPaused] = React.useState(paused);
@@ -3129,6 +3191,9 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
                 <R7Stat value={panel[1].v} label={panel[1].l} />
               </div>
             )}
+            {isEmom && (
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 11.5, lineHeight: 1.45, color: "rgba(255,255,255,.62)", textAlign: "center", margin: "4px 0 0", maxWidth: 268, textWrap: "pretty" }}>Cuando ya no completes las reps dentro del minuto, finaliza la sección.</p>
+            )}
           </div>
         </div>
 
@@ -3153,6 +3218,20 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
           </div>
         </div>
 
+        {isEmom ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 16, flexShrink: 0 }}>
+            <R6CtrlBtn>
+              <R6Icon size={17} stroke="#fff"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></g></R6Icon>
+            </R6CtrlBtn>
+            <R6CtrlBtn primary onClick={() => setPaused((p) => !p)}>
+              {isPaused ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="7 4 20 12 7 20" /></svg>
+                : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>}
+            </R6CtrlBtn>
+            <button onClick={finishNow} title="Finalizar sección" style={{ width: 46, height: 46, borderRadius: "50%", background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <R6Icon size={17} stroke="var(--ff-red)" w={2.4}><polyline points="20 6 9 17 4 12" /></R6Icon>
+            </button>
+          </div>
+        ) : (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 16, flexShrink: 0 }}>
           <R6CtrlBtn dim={sIdx === 0} onClick={() => goStep(-1)}>
             <R6Icon size={17} stroke="#fff"><g><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></g></R6Icon>
@@ -3168,6 +3247,7 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
             <R6Icon size={17} stroke="#fff"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></g></R6Icon>
           </R6CtrlBtn>
         </div>
+        )}
 
         {/* A continuación · más delgado, ya no compite con el anillo */}
         <button onClick={() => (isLastStep ? finishNow() : setQueue(true))}
@@ -3197,6 +3277,31 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
         </div>
       )}
       {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={curName} /></div>}
+      {intro && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "rgba(0,0,0,.72)", ...R7_SHEET }}>
+          <div style={{ width: "100%", background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: 16, padding: "20px 18px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: color }}>EMOM · {block.minutesTotal} min</span>
+            </div>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: "0 0 10px", letterSpacing: "-.3px", lineHeight: 1.35 }}>Cómo funciona esta sección</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "rgba(255,255,255,.75)", lineHeight: 1.6, margin: "0 0 14px", textWrap: "pretty" }}>
+              Cada minuto en punto haces las repeticiones indicadas; el tiempo que te sobre dentro del minuto es tu descanso.
+            </p>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "11px 12px", marginBottom: 16 }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <R6Icon size={13} stroke="var(--ff-red)" w={2.4}><polyline points="20 6 9 17 4 12" /></R6Icon>
+              </span>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: 0, textWrap: "pretty" }}>
+                {!forceLast && blocks[bIdx + 1]
+                  ? "Cuando ya no completes las reps del minuto, toca este botón: cierras esta sección y pasas a la siguiente. Tu rutina continúa."
+                  : "Cuando ya no completes las reps del minuto, toca este botón: es la última sección, tu rutina finalizaría."}
+              </p>
+            </div>
+            <button onClick={() => setIntro(false)} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px", cursor: "pointer" }}>Comenzar sección</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4136,6 +4241,9 @@ function Catalog() {
         { label: "Workout", note: "Viendo otra semana", el: <WorkoutListScreen onSelectDay={noop} initialWeek={4} /> },
         { label: "Workout", note: "Sin plan cargado", el: <WorkoutEmptyScreen onStartTutorial={noop} /> },
         { label: "Rutinas anteriores", note: "Completadas y pendientes", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} /> },
+        { label: "Rutinas anteriores", note: "Hoy completada · acciones de la fila", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} todayDone demoMenu /> },
+        { label: "Rutinas anteriores", note: "Deshacer al desmarcar", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} demoSnack /> },
+        { label: "Rutinas anteriores", note: "Pendientes tras desmarcar", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} initialFilter="pending" demoUndone /> },
       ],
     },
     {
@@ -4169,7 +4277,9 @@ function Catalog() {
         { label: "Stripset", el: <TrainerImmersiveScreen blockIdx={2} /> },
         { label: "For time", note: "Un arco por ronda; el cronómetro sube dentro del anillo", el: <TrainerImmersiveScreen blockIdx={3} /> },
         { label: "AMRAP", note: "El anillo se completa conforme baja el restante del bloque", el: <TrainerImmersiveScreen blockIdx={4} /> },
-        { label: "EMOM", note: "El anillo reinicia cada minuto", el: <TrainerImmersiveScreen blockIdx={5} /> },
+        { label: "EMOM", note: "Sin atrás ni siguiente: finalizar sección a la derecha", el: <TrainerImmersiveScreen blockIdx={5} /> },
+        { label: "EMOM · antes de empezar", note: "Explica la mecánica y qué hace finalizar", el: <TrainerImmersiveScreen blockIdx={5} emomIntro /> },
+        { label: "EMOM · última sección", note: "El aviso cambia: la rutina finalizaría", el: <TrainerImmersiveScreen blockIdx={5} emomIntro forceLast /> },
         { label: "Cardio tradicional", note: "Anillo sobre el tiempo total del cardio", el: <TrainerImmersiveScreen blockIdx={6} /> },
         { label: "Cardio intervalos", el: <TrainerImmersiveScreen blockIdx={7} /> },
         { label: "Descanso", note: "Video desaturado y anillo gris de descanso", el: <TrainerImmersiveScreen blockIdx={1} /> },
@@ -4240,3 +4350,5 @@ function Catalog() {
 }
 
 window.Catalog = Catalog;
+
+
