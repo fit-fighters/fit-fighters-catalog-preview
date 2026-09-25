@@ -2344,7 +2344,7 @@ function MilestoneScreen({
       color: "var(--ff-text)",
       fontWeight: 600
     }
-  }, "Novatos gym — Nivel 2")), /*#__PURE__*/React.createElement("div", {
+  }, "Novatos gym \u2014 Nivel 2")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -2739,7 +2739,7 @@ function ProfileScreen({
       color: "var(--ff-text)",
       fontWeight: 500
     }
-  }, "fitfighters.com"), " — renovaciones, cambios de plan y m\xE1s."), /*#__PURE__*/React.createElement("div", {
+  }, "fitfighters.com"), " \u2014 renovaciones, cambios de plan y m\xE1s."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -4804,4 +4804,3 @@ __ds_ns.FloatingTopBar = __ds_scope.FloatingTopBar;
 __ds_ns.BottomSheet = __ds_scope.BottomSheet;
 
 })();
-

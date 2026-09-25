@@ -1930,7 +1930,12 @@ function ProfileSectionLabel({ children }) {
   return <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "20px 2px 8px" }}>{children}</p>;
 }
 
-function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onClose }) {
+const APP_LANGUAGES = [
+  { code: "es", name: "Español", local: "Español" },
+  { code: "en", name: "English", local: "Inglés" },
+];
+
+function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onLanguage, lang = "es", onClose }) {
   const [scrolled, onScroll] = useBarScroll();
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Perfil">
@@ -1984,6 +1989,12 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
           <MenuRow icon={ProfileIcon(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)} label="Cambiar contraseña" sublabel="Solo cuentas con correo" divider onClick={onChangePassword} />
         </Card>
 
+        {/* Preferences */}
+        <ProfileSectionLabel>Preferencias</ProfileSectionLabel>
+        <Card padding="0">
+          <MenuRow icon={ProfileIcon(<><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>)} label="Idioma" sublabel={(APP_LANGUAGES.find((l) => l.code === lang) || APP_LANGUAGES[0]).name} onClick={onLanguage} />
+        </Card>
+
         {/* Support */}
         <ProfileSectionLabel>Soporte</ProfileSectionLabel>
         <Card padding="0">
@@ -2001,15 +2012,40 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
 
         <p style={{ textAlign: "center", fontFamily: "var(--font-body)", fontSize: 10, color: "var(--ff-text-3)", padding: 16 }}>FitFighters v2.0.0</p>
       </div>
-
-      <div style={{ ...DARK_NAV_CONTEXT, position: "absolute", left: 0, right: 0, bottom: 0 }}>
-        <BottomNav active={tab} onChange={onTab} />
-      </div>
     </div>
   );
 }
 
 window.ProfileScreen = ProfileScreen;
+
+function LanguageScreen({ lang = "es", onChange, onBack }) {
+  const [scrolled, onScroll] = useBarScroll();
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Idioma">
+      <FloatingTopBar title="Idioma" onBack={onBack} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "64px 16px 24px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 2px 6px" }}>Idioma</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: "0 2px 20px", textWrap: "pretty" }}>Elige el idioma de la app. Tus rutinas y videos no cambian.</p>
+        <Card padding="0">
+          {APP_LANGUAGES.map((l, i) => {
+            const sel = l.code === lang;
+            return (
+              <button key={l.code} onClick={() => onChange && onChange(l.code)} role="radio" aria-checked={sel} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 60, padding: "12px 16px", background: "transparent", border: "none", borderTop: i ? "1px solid var(--ff-border)" : "none", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: sel ? 600 : 400, color: "var(--ff-text)", margin: 0 }}>{l.name}</p>
+                  {l.local !== l.name ? <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "2px 0 0" }}>{l.local}</p> : null}
+                </div>
+                <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box", border: sel ? "6px solid var(--ff-red)" : "2px solid var(--ff-text-3)", transition: "border .15s ease" }} />
+              </button>
+            );
+          })}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+window.LanguageScreen = LanguageScreen;
 
 // ── Trainer.jsx ─────────────────────────────────────────────────
 // FitFighters mobile — Virtual trainer. Supports all 7 section block types with real per-type
@@ -4050,6 +4086,7 @@ window.PhoneFrame = PhoneFrame;
 function App() {
   const [screen, setScreen] = React.useState("login");
   const [tab, setTab] = React.useState("workout");
+  const [lang, setLang] = React.useState("es");
   const [selectedDay, setSelectedDay] = React.useState(null);
   const [blocks, setBlocks] = React.useState(() => JSON.parse(JSON.stringify(window.FF_DATA.routineDetailBlocks || [])));
   const [activeExercise, setActiveExercise] = React.useState(null); // { ex, blockIndex }
@@ -4070,6 +4107,7 @@ function App() {
     milestone:         () => setScreen("milestone"),
     profile:           () => { setTab("profile"); setScreen("profile"); },
     editProfile:       () => setScreen("editProfile"),
+    language:          () => setScreen("language"),
     changePassword:    () => setScreen("changePassword"),
     changeProgram:     () => setScreen("changeProgram"),
     generationHistory: () => setScreen("generationHistory"),
@@ -4126,10 +4164,13 @@ function App() {
       body = <ChangeExerciseScreen exercise={activeExercise?.ex} onBack={() => setScreen("exerciseDetail")} onConfirm={onExerciseChanged} />;
       break;
     case "profile":
-      body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} onGenerations={nav.generationHistory} />;
+      body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} lang={lang} onLanguage={nav.language} onGenerations={nav.generationHistory} />;
       break;
     case "editProfile":
       body = <EditProfileScreen onBack={nav.profile} />;
+      break;
+    case "language":
+      body = <LanguageScreen lang={lang} onChange={setLang} onBack={nav.profile} />;
       break;
     case "changePassword":
       body = <ChangePasswordScreen onBack={nav.profile} />;
@@ -4302,6 +4343,7 @@ function Catalog() {
       title: "Perfil y cuenta",
       cells: [
         { label: "Perfil", note: "Modal de abajo hacia arriba: cierre a la derecha", el: <ProfileScreen tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
+        { label: "Idioma", note: "Se aplica al tocar; sin botón de guardar", el: <LanguageScreen lang="es" onBack={noop} /> },
         { label: "Editar perfil", el: <EditProfileScreen onBack={noop} /> },
         { label: "Cambiar contraseña", el: <ChangePasswordScreen onBack={noop} /> },
         { label: "Cambiar contraseña", note: "Error de validación", el: <ChangePasswordScreen initialCurrent="FitFighters1" initialNext="NuevaClave1" initialConfirm="NuevaClave2" onBack={noop} /> },
@@ -4312,7 +4354,7 @@ function Catalog() {
       cells: [
         { label: "Cambiar plan", note: "Lista", el: <ChangeProgramScreen initialView="list" onBack={noop} onConfirm={noop} /> },
         { label: "Cambiar plan", note: "Filtros en hoja inferior", el: <ChangeProgramScreen initialView="list" initialFilterOpen onBack={noop} onConfirm={noop} /> },
-        { label: "Cambiar días de entrenamiento", note: "Con diálogo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar días de entrenamiento", note: "Con di\u00e1logo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Suscrito", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Plan free", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} plan="free" onBack={noop} onConfirm={noop} /> },
       ],
@@ -4350,5 +4392,3 @@ function Catalog() {
 }
 
 window.Catalog = Catalog;
-
-
