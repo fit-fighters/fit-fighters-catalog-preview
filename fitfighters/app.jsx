@@ -2047,6 +2047,177 @@ function LanguageScreen({ lang = "es", onChange, onBack }) {
 
 window.LanguageScreen = LanguageScreen;
 
+// ── Chat.jsx ───────────────────────────────────────────────────
+// Pestaña Chat: el asistente con IA vive dentro de la app; los entrenadores se
+// contactan por WhatsApp (tocar la fila abre WhatsApp fuera de la app).
+const APP_COACHES = [
+  { id: "c1", name: "Daniel Ortega", role: "Entrenador de tu plan", phone: "5215512345678" },
+];
+const APP_WA_D = "M11.997 2C6.477 2 2 6.477 2 11.997c0 1.99.584 3.84 1.588 5.39L2 22l4.734-1.558A9.935 9.935 0 0011.997 22C17.517 22 22 17.523 22 12.003 22 6.477 17.517 2 11.997 2zM17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z";
+const APP_AI_SUGGESTIONS = [
+  "¿Con qué sustituyo las sentadillas si me molesta la rodilla?",
+  "Explícame cómo funciona un AMRAP",
+  "¿Qué como antes de entrenar?",
+];
+const APP_AI_SEED = [
+  { role: "user", text: "¿Cuánto descanso entre series en la rutina de hoy?" },
+  { role: "ai", text: "En los bloques Cycle descansa entre 60 y 90 segundos por serie. Si la última serie te quedó a 1 o 2 reps del fallo, toma los 90. En el AMRAP no hay descanso fijo: pausa solo lo necesario para mantener la técnica." },
+  { role: "user", text: "¿Y si no llego a las reps objetivo?" },
+  { role: "ai", text: "No pasa nada: las reps son una referencia. Termina la serie con buena técnica. Si en dos series seguidas te quedas lejos del objetivo, baja el peso un 5–10 % en la siguiente." },
+];
+
+function WaGlyph({ size = 18, color = "#fff" }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path fillRule="evenodd" d={APP_WA_D} /></svg>;
+}
+
+function AIMark({ size = 40, dark }) {
+  return (
+    <span style={{ width: size, height: size, borderRadius: size * 0.3, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: dark ? "rgba(255,50,0,0.16)" : "var(--ff-primary-container)" }}>
+      <img src={window.__resources?.ffMark || "assets/logos/ff_mark.svg"} alt="" style={{ width: size * 0.5 }} />
+    </span>
+  );
+}
+
+function ChatHomeScreen({ coaches = APP_COACHES, onOpenAI, onTab, demoToast }) {
+  const [toast, setToast] = React.useState(demoToast ? coaches[0] : null);
+  React.useEffect(() => {
+    if (!toast || demoToast) return;
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [toast]);
+  // En la app real: intent a https://wa.me/<phone>. Aquí solo se muestra el aviso.
+  const openCoach = (c) => setToast(c);
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Chat">
+      <header style={{ display: "flex", alignItems: "center", height: 56, padding: "0 16px", flexShrink: 0 }}>
+        <InitialsAvatar />
+      </header>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 16px 24px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "0 2px 16px" }}>Chat</h1>
+
+        <ProfileSectionLabel>{coaches.length === 1 ? "Tu entrenador" : "Tus entrenadores"}</ProfileSectionLabel>
+        <Card padding="0">
+          {coaches.map((c, i) => (
+            <button key={c.id} onClick={() => openCoach(c)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 68, padding: "12px 16px", background: "transparent", border: "none", borderTop: i ? "1px solid var(--ff-border)" : "none", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ width: 44, height: 44, borderRadius: 999, flexShrink: 0, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-display)", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.name.split(/\s+/).slice(0, 2).map(w => w[0]).join("")}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)" }}>{c.name}</span>
+                <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>{c.role}</span>
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", borderRadius: 999, background: "#1FA855", flexShrink: 0 }}>
+                <WaGlyph size={15} />
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700, color: "#fff" }}>WhatsApp</span>
+              </span>
+            </button>
+          ))}
+        </Card>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.5, margin: "10px 2px 0" }}>La conversación con tu entrenador se abre en WhatsApp.</p>
+
+        <ProfileSectionLabel>Asistente IA</ProfileSectionLabel>
+        <div onClick={onOpenAI} style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <AIMark />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.3, margin: "2px 0 6px" }}>Pregúntale a FitFighters</h2>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Técnica, sustituciones o nutrición. Responde al momento y conoce tu plan.</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, height: 46, padding: "0 6px 0 14px", borderRadius: 12, background: "var(--ff-surface-2)", border: "1px solid var(--ff-border)" }}>
+            <span style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-3)" }}>Escribe tu pregunta…</span>
+            <span style={{ width: 34, height: 34, borderRadius: 10, background: "var(--ff-red)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+      {toast && (
+        <div style={{ position: "absolute", left: 16, right: 16, bottom: 92, zIndex: 5, display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", boxShadow: "0 6px 20px rgba(0,0,0,0.10)" }}>
+          <WaGlyph size={18} color="#1FA855" />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)" }}>Abriendo WhatsApp con {toast.name.split(" ")[0]}…</span>
+        </div>
+      )}
+      <TwoTabBar active="chat" onChange={onTab} />
+    </div>
+  );
+}
+
+function AIChatScreen({ seed, demoTyping, onBack, suggestions }) {
+  const [msgs, setMsgs] = React.useState(seed || []);
+  const [text, setText] = React.useState("");
+  const [typing, setTyping] = React.useState(!!demoTyping);
+  const listRef = React.useRef(null);
+  React.useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, typing]);
+  const send = async (q) => {
+    const body = (q ?? text).trim();
+    if (!body || typing) return;
+    const next = [...msgs, { role: "user", text: body }];
+    setMsgs(next); setText(""); setTyping(true);
+    const p = window.FF_DATA.program;
+    const sys = `Eres el asistente de FitFighters, una app de entrenamiento. Responde en español, tuteando, con tono de coach directo y motivador, sin emoji ni markdown, en máximo 80 palabras. Programa del usuario: ${p.name}, nivel ${p.level}, semana ${p.week} de ${p.totalWeeks}. Ante dolor o lesión, recomienda hablar con su entrenador.`;
+    const convo = next.map(m => (m.role === "user" ? "Usuario: " : "Asistente: ") + m.text).join("\n");
+    let reply;
+    try { reply = await window.claude.complete(sys + "\n\n" + convo + "\nAsistente:"); }
+    catch (e) { reply = null; }
+    setMsgs(m => [...m, reply ? { role: "ai", text: String(reply).trim() } : { role: "ai", error: true, text: "No pude responder ahora. Inténtalo de nuevo." }]);
+    setTyping(false);
+  };
+  const empty = msgs.length === 0 && !typing;
+  const canSend = text.trim().length > 0 && !typing;
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Asistente IA">
+      <style>{"@keyframes ffTypingDot{0%,80%,100%{opacity:.25}40%{opacity:1}}"}</style>
+      <header style={{ display: "flex", alignItems: "center", gap: 10, height: 60, padding: "0 12px", flexShrink: 0, background: "var(--ff-surface)", borderBottom: "1px solid var(--ff-border)" }}>
+        <CircleIconBtn kind="back" onClick={onBack} plain />
+        <AIMark size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", letterSpacing: "-.2px", margin: 0 }}>Asistente IA</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: typing ? "var(--ff-green)" : "var(--ff-text-3)", margin: "2px 0 0" }}>{typing ? "Escribiendo…" : "Conoce tu plan"}</p>
+        </div>
+      </header>
+
+      <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {empty ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 8 }}>
+            <div style={{ textAlign: "center", padding: "0 12px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}><AIMark size={56} /></div>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>¿En qué te ayudo hoy?</h2>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0 }}>Pregunta lo que quieras sobre tu plan y tus rutinas.</p>
+            </div>
+            {suggestions && APP_AI_SUGGESTIONS.map((s) => (
+              <button key={s} onClick={() => send(s)} style={{ width: "100%", textAlign: "left", padding: "13px 14px", borderRadius: 14, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 14, cursor: "pointer" }}>{s}</button>
+            ))}
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11.5, color: "var(--ff-text-3)", lineHeight: 1.5, textAlign: "center", margin: "8px 12px 0" }}>La IA puede equivocarse. Si sientes dolor o tienes una lesión, habla con tu entrenador.</p>
+          </div>
+        ) : (
+          <React.Fragment>
+            {msgs.map((m, i) => m.role === "user" ? (
+              <div key={i} style={{ alignSelf: "flex-end", maxWidth: "82%", padding: "10px 14px", borderRadius: "16px 16px 4px 16px", background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.20)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.45 }}>{m.text}</div>
+            ) : (
+              <div key={i} style={{ alignSelf: "flex-start", maxWidth: "86%", padding: "11px 14px", borderRadius: "16px 16px 16px 4px", background: "var(--ff-surface)", border: m.error ? "1px solid rgba(255,92,92,.45)" : "1px solid var(--ff-border)", color: m.error ? "#D93A3A" : "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap", textWrap: "pretty" }}>{m.text}</div>
+            ))}
+            {typing && (
+              <div style={{ alignSelf: "flex-start", display: "flex", gap: 5, padding: "14px 16px", borderRadius: "16px 16px 16px 4px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)" }}>
+                {[0, 1, 2].map(k => <span key={k} style={{ width: 7, height: 7, borderRadius: 999, background: "var(--ff-text-2)", animation: `ffTypingDot 1.2s ${k * 0.18}s infinite ease-in-out` }} />)}
+              </div>
+            )}
+          </React.Fragment>
+        )}
+      </div>
+
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", gap: 8, padding: "28px 12px 22px", marginTop: -28, position: "relative", zIndex: 2, background: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 62%, rgba(255,255,255,0) 100%)" }}>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} rows={1} placeholder="Escribe tu pregunta…" style={{ flex: 1, minHeight: 46, maxHeight: 120, resize: "none", boxSizing: "border-box", padding: "13px 14px", borderRadius: 14, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.35, outline: "none" }} />
+        <button onClick={() => send()} disabled={!canSend} aria-label="Enviar" style={{ width: 46, height: 46, borderRadius: 12, border: "none", flexShrink: 0, background: canSend ? "var(--ff-red)" : "var(--ff-surface-2)", cursor: canSend ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .15s ease" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={canSend ? "#fff" : "var(--ff-text-3)"} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+window.ChatHomeScreen = ChatHomeScreen;
+window.AIChatScreen = AIChatScreen;
+
+
 // ── Trainer.jsx ─────────────────────────────────────────────────
 // FitFighters mobile — Virtual trainer. Supports all 7 section block types with real per-type
 // timing behavior: reps-vs-time Cycle, count-up For time, countdown+rounds AMRAP, sequence
@@ -4106,6 +4277,8 @@ function App() {
     summary:           () => setScreen("summary"),
     milestone:         () => setScreen("milestone"),
     profile:           () => { setTab("profile"); setScreen("profile"); },
+    chat:              () => { setTab("chat"); setScreen("chat"); },
+    aiChat:            () => setScreen("aiChat"),
     editProfile:       () => setScreen("editProfile"),
     language:          () => setScreen("language"),
     changePassword:    () => setScreen("changePassword"),
@@ -4128,7 +4301,8 @@ function App() {
   const onTab = (t) => {
     setTab(t);
     if (t === "profile") setScreen("profile");
-    else setScreen("workout"); // chat — no dedicated screen yet
+    else if (t === "chat") setScreen("chat");
+    else setScreen("workout");
   };
 
   let body;
@@ -4165,6 +4339,12 @@ function App() {
       break;
     case "profile":
       body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} lang={lang} onLanguage={nav.language} onGenerations={nav.generationHistory} />;
+      break;
+    case "chat":
+      body = <ChatHomeScreen onOpenAI={nav.aiChat} onTab={(t) => (t === "workout" ? nav.workout() : nav.chat())} />;
+      break;
+    case "aiChat":
+      body = <AIChatScreen onBack={nav.chat} />;
       break;
     case "editProfile":
       body = <EditProfileScreen onBack={nav.profile} />;
@@ -4368,9 +4548,14 @@ function Catalog() {
       ],
     },
     {
-      title: "En construcción",
+      title: "Chat",
       cells: [
-        { label: "Sección en desarrollo", el: <WipScreen title="Chat" onBack={noop} /> },
+        { label: "Chat", note: "Entrenador y asistente IA", el: <ChatHomeScreen onOpenAI={noop} onTab={noop} /> },
+        { label: "Chat", note: "Al tocar al entrenador se abre WhatsApp", el: <ChatHomeScreen demoToast onOpenAI={noop} onTab={noop} /> },
+        { label: "Asistente IA", note: "Conversación nueva · sin sugerencias", el: <AIChatScreen onBack={noop} /> },
+        { label: "Asistente IA", note: "Conversación nueva · con sugerencias rápidas", el: <AIChatScreen suggestions onBack={noop} /> },
+        { label: "Asistente IA", note: "Conversación en curso", el: <AIChatScreen seed={APP_AI_SEED} onBack={noop} /> },
+        { label: "Asistente IA", note: "Respondiendo", el: <AIChatScreen seed={APP_AI_SEED.slice(0, 3)} demoTyping onBack={noop} /> },
       ],
     },
   ];
