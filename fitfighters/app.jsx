@@ -1963,7 +1963,7 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
           </div>
         </div>
 
-        {/* Feedback beta — solo usuarios de la beta */}
+        {/* TEMPORAL · feedback beta — solo usuarios de la beta */}
         {beta ? (
           <Card padding="0" style={{ borderColor: "rgba(255,50,0,0.30)" }}>
             <MenuRow onClick={onFeedback}
@@ -3551,7 +3551,9 @@ function R6SwapBtn({ onClick }) {
 window.TrainerImmersiveScreen = TrainerImmersiveScreen;
 
 // ── BetaFeedback.jsx ────────────────────────────────────────────
-// Feedback de la beta: tarjeta en el Resumen + pantalla desde Perfil. Aprobado (light).
+// TEMPORAL · Feedback de la beta: tarjeta en el Resumen + pantalla desde Perfil. Aprobado (light).
+// Para eliminarlo: borrar este bloque, los bloques "TEMPORAL" de SummaryScreen / ProfileScreen,
+// la ruta "feedback" del App y la sección "Feedback beta" del catálogo.
 
 const fbTheme = () => ({ ...APP_LIGHT_BG, ...APP_LIGHT });
 const FB_LIMIT = 90;   // s máximos por audio
@@ -3784,7 +3786,7 @@ function FeedbackCard({ initial = {}, live, offline, micDenied, question = FB_QU
             <span style={{ flex: 1 }} />
           </div>
           <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", lineHeight: 1.4, margin: "2px 0 6px", letterSpacing: "-.2px", textWrap: "pretty" }}>Estás construyendo la nueva FitFighters</p>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.45, margin: 0, textWrap: "pretty" }}>Gracias por ser parte de la beta. Lo que nos cuentes decide qué mejoramos. Son dos preguntas, menos de 2 minutos.</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.45, margin: 0, textWrap: "pretty" }}>Gracias por ser parte de la beta. Lo que nos cuentes decide qué mejoramos. {question ? "Son dos preguntas, menos de 2 minutos." : "Solo una pregunta, te toma unos segundos."}</p>
           <div style={{ height: 1, background: "var(--ff-border)", margin: "16px -16px 14px" }} />
           <p style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.35, margin: "0 0 12px", textWrap: "pretty" }}>Comparada con la app anterior, el entrenamiento de hoy se sintió…</p>
           <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
@@ -3798,9 +3800,17 @@ function FeedbackCard({ initial = {}, live, offline, micDenied, question = FB_QU
               );
             })}
           </div>
-          <div style={{ height: 1, background: "var(--ff-border)", margin: "16px -16px 14px" }} />
-          <p style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.35, margin: "0 0 14px", textWrap: "pretty" }}>{question}</p>
-          {composer}
+          {question ? (
+            <>
+              <div style={{ height: 1, background: "var(--ff-border)", margin: "16px -16px 14px" }} />
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.35, margin: "0 0 14px", textWrap: "pretty" }}>{question}</p>
+              {composer}
+            </>
+          ) : (
+            <div style={{ marginTop: 16 }}>
+              <Button variant="primary" loading={s.phase === "sending"} disabled={!rating} onClick={() => api.send("rating")} style={{ height: 52 }}>{s.phase === "sending" ? "Enviando…" : "Enviar"}</Button>
+            </div>
+          )}
         </div>
       </Collapse>
       <Collapse open={collapsed}>
@@ -3953,7 +3963,7 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function SummaryScreen({ onHome, onMilestone, feedback = {}, focusFeedback, feedbackLive = true, offline, micDenied }) {
+function SummaryScreen({ onHome, onMilestone, beta = true, feedback = {}, feedbackQuestion = FB_QUESTION, focusFeedback, feedbackLive = true, offline, micDenied }) {
   const s = window.FF_DATA.summary;
   const scrollRef = React.useRef(null);
   const cardRef = React.useRef(null);
@@ -3984,8 +3994,8 @@ function SummaryScreen({ onHome, onMilestone, feedback = {}, focusFeedback, feed
           <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0 }}>¡Excelente trabajo, sigue así!</p>
         </div>
 
-        {/* Feedback beta */}
-        <div ref={cardRef}><FeedbackCard initial={feedback} live={feedbackLive} offline={offline} micDenied={micDenied} /></div>
+        {/* TEMPORAL · feedback beta */}
+        {beta ? <div ref={cardRef}><FeedbackCard initial={feedback} question={feedbackQuestion} live={feedbackLive} offline={offline} micDenied={micDenied} /></div> : null}
 
         {/* Total time */}
         <div style={{ background: "var(--ff-surface)", borderRadius: 16, padding: 20, border: "1px solid var(--ff-border)" }}>
@@ -4926,17 +4936,7 @@ function Catalog() {
     {
       title: "Fin de rutina",
       cells: [
-        { label: "Resumen", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} /> },
-        { label: "Feedback beta", note: "Rating elegido", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor" }} /> },
-        { label: "Feedback beta", note: "Grabando · tap para iniciar y detener", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 24 }} /> },
-        { label: "Feedback beta", note: "Grabando · cerca del límite de 1:30", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 78 }} /> },
-        { label: "Feedback beta", note: "Grabación lista", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recorded", clipLen: 42, playPos: 15 }} /> },
-        { label: "Feedback beta", note: "Enviando", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sending", sendFrom: "recorded", clipLen: 42 }} /> },
-        { label: "Feedback beta", note: "Modo texto", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "igual", phase: "text", text: "Al terminar la serie no encontré dónde pasar al siguiente ejercicio." }} /> },
-        { label: "Feedback beta", note: "Enviado · la tarjeta colapsa", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sent" }} /> },
-        { label: "Feedback beta", note: "Sin conexión · en cola", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "queued" }} /> },
-        { label: "Feedback beta", note: "Enviar sin responder · solo rating", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "skipped", prev: "idle" }} /> },
-        { label: "Feedback beta", note: "Micrófono denegado", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "denied" }} /> },
+        { label: "Resumen", el: <SummaryScreen beta={false} onHome={noop} onMilestone={noop} /> },
         { label: "Logro desbloqueado", el: <MilestoneScreen onClose={noop} /> },
         { label: "Logro", note: "Compartir", el: <MilestoneScreen initialShareOpen={true} onClose={noop} /> },
       ],
@@ -4944,15 +4944,7 @@ function Catalog() {
     {
       title: "Perfil y cuenta",
       cells: [
-        { label: "Perfil", note: "Modal de abajo hacia arriba: cierre a la derecha", el: <ProfileScreen tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
-        { label: "Enviar feedback", note: "Beta · inicial", el: <FeedbackScreen initial={{ mode: "voice" }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Grabando", el: <FeedbackScreen initial={{ mode: "voice", phase: "recording", elapsed: 37 }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Grabación lista", el: <FeedbackScreen initial={{ mode: "voice", phase: "recorded", clipLen: 64, playPos: 22 }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Escribiendo", el: <FeedbackScreen initial={{ mode: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Enviando", el: <FeedbackScreen initial={{ mode: "text", phase: "sending", sendFrom: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Enviado", el: <FeedbackScreen initial={{ phase: "sent" }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Sin conexión · en cola", el: <FeedbackScreen initial={{ phase: "queued" }} onBack={noop} /> },
-        { label: "Enviar feedback", note: "Micrófono denegado", el: <FeedbackScreen initial={{ mode: "voice", phase: "denied" }} onBack={noop} /> },
+        { label: "Perfil", note: "Modal de abajo hacia arriba: cierre a la derecha", el: <ProfileScreen beta={false} tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
         { label: "Idioma", note: "Se aplica al tocar; sin botón de guardar", el: <LanguageScreen lang="es" onBack={noop} /> },
         { label: "Editar perfil", el: <EditProfileScreen onBack={noop} /> },
         { label: "Cambiar contraseña", el: <ChangePasswordScreen onBack={noop} /> },
@@ -4986,6 +4978,33 @@ function Catalog() {
         { label: "Asistente IA", note: "Conversación nueva · con sugerencias rápidas", el: <AIChatScreen suggestions onBack={noop} /> },
         { label: "Asistente IA", note: "Conversación en curso", el: <AIChatScreen seed={APP_AI_SEED} onBack={noop} /> },
         { label: "Asistente IA", note: "Respondiendo", el: <AIChatScreen seed={APP_AI_SEED.slice(0, 3)} demoTyping onBack={noop} /> },
+      ],
+    },
+    {
+      title: "Feedback beta · temporal",
+      cells: [
+        { label: "Resumen", note: "Tarjeta bajo \"Rutina completada\" · inicial", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback /> },
+        { label: "Resumen", note: "Rating elegido", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor" }} /> },
+        { label: "Resumen", note: "Grabando · tap para iniciar y detener", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 24 }} /> },
+        { label: "Resumen", note: "Grabando · cerca del límite de 1:30", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 78 }} /> },
+        { label: "Resumen", note: "Grabación lista", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recorded", clipLen: 42, playPos: 15 }} /> },
+        { label: "Resumen", note: "Enviando", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sending", sendFrom: "recorded", clipLen: 42 }} /> },
+        { label: "Resumen", note: "Modo texto", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "igual", phase: "text", text: "Al terminar la serie no encontré dónde pasar al siguiente ejercicio." }} /> },
+        { label: "Resumen", note: "Enviado · la tarjeta colapsa", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sent" }} /> },
+        { label: "Resumen", note: "Sin conexión · en cola", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "queued" }} /> },
+        { label: "Resumen", note: "Enviar sin responder · solo rating", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "skipped", prev: "idle" }} /> },
+        { label: "Resumen", note: "Sin preguntas pendientes · solo rating", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedbackQuestion={null} /> },
+        { label: "Resumen", note: "Solo rating · elegido", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedbackQuestion={null} feedback={{ rating: "mejor" }} /> },
+        { label: "Resumen", note: "Micrófono denegado", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "denied" }} /> },
+        { label: "Perfil", note: "Fila beta bajo el encabezado", el: <ProfileScreen tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} onFeedback={noop} /> },
+        { label: "Enviar feedback", note: "Beta · inicial", el: <FeedbackScreen initial={{ mode: "voice" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Grabando", el: <FeedbackScreen initial={{ mode: "voice", phase: "recording", elapsed: 37 }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Grabación lista", el: <FeedbackScreen initial={{ mode: "voice", phase: "recorded", clipLen: 64, playPos: 22 }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Escribiendo", el: <FeedbackScreen initial={{ mode: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Enviando", el: <FeedbackScreen initial={{ mode: "text", phase: "sending", sendFrom: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Enviado", el: <FeedbackScreen initial={{ phase: "sent" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Sin conexión · en cola", el: <FeedbackScreen initial={{ phase: "queued" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Micrófono denegado", el: <FeedbackScreen initial={{ mode: "voice", phase: "denied" }} onBack={noop} /> },
       ],
     },
   ];
