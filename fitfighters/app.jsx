@@ -1935,7 +1935,7 @@ const APP_LANGUAGES = [
   { code: "en", name: "English", local: "Inglés" },
 ];
 
-function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onLanguage, lang = "es", onClose }) {
+function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onLanguage, onFeedback, beta = true, lang = "es", onClose }) {
   const [scrolled, onScroll] = useBarScroll();
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Perfil">
@@ -1962,6 +1962,16 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
             </div>
           </div>
         </div>
+
+        {/* Feedback beta — solo usuarios de la beta */}
+        {beta ? (
+          <Card padding="0" style={{ borderColor: "rgba(255,50,0,0.30)" }}>
+            <MenuRow onClick={onFeedback}
+              icon={ProfileIcon(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />)}
+              label={<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>Enviar feedback <Badge tone="accent">Beta</Badge></span>}
+              sublabel="Cuéntanos cómo te va con la nueva app" />
+          </Card>
+        ) : null}
 
         {/* Subscription */}
         <ProfileSectionLabel>Suscripción</ProfileSectionLabel>
@@ -3540,6 +3550,396 @@ function R6SwapBtn({ onClick }) {
 
 window.TrainerImmersiveScreen = TrainerImmersiveScreen;
 
+// ── BetaFeedback.jsx ────────────────────────────────────────────
+// Feedback de la beta: tarjeta en el Resumen + pantalla desde Perfil. Aprobado (light).
+
+const fbTheme = () => ({ ...APP_LIGHT_BG, ...APP_LIGHT });
+const FB_LIMIT = 90;   // s máximos por audio
+const FB_WARN = 60;    // a partir de aquí se muestra el límite
+const FB_QUESTION = "¿Hubo algún momento hoy en que no supiste qué hacer o dónde tocar?";
+const FB_OPEN_Q = "Cuéntanos lo que quieras: algo que te gustó, algo que no funcionó o una idea.";
+const fbTime = (s) => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+
+function FbIcon({ children, size = 20, color = "currentColor", sw = 2, fill = "none" }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flexShrink: 0 }}>{children}</svg>;
+}
+const IC = {
+  mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v1a7 7 0 0 0 14 0v-1" /><line x1="12" y1="18" x2="12" y2="22" /></>,
+  micOff: <><line x1="2" y1="2" x2="22" y2="22" /><path d="M9 9v2a3 3 0 0 0 5.12 2.12" /><path d="M15 9.34V5a3 3 0 0 0-5.94-.6" /><path d="M19 10v1a7 7 0 0 1-1.1 3.8" /><path d="M5 10v1a7 7 0 0 0 11.4 5.4" /><line x1="12" y1="18" x2="12" y2="22" /></>,
+  up: <><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></>,
+  down: <><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></>,
+  equal: <><line x1="5" y1="9" x2="19" y2="9" /><line x1="5" y1="15" x2="19" y2="15" /></>,
+  check: <polyline points="20 6 9 17 4 12" />,
+  redo: <><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></>,
+  clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+  text: <><path d="M4 7V4h16v3" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></>,
+  msg: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+  back: <path d="M19 12H5M12 5l-7 7 7 7" />,
+  close: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
+};
+const StopGlyph = ({ size = 16 }) => <span style={{ width: size, height: size, borderRadius: 3, background: "#fff", display: "block", flexShrink: 0 }} />;
+const PlayGlyph = ({ size = 18, color = "#fff" }) => <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }}><path d="M7 4.5v15l12-7.5z" fill={color} /></svg>;
+const PauseGlyph = ({ size = 18, color = "#fff" }) => <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }}><rect x="6" y="4.5" width="4" height="15" rx="1" fill={color} /><rect x="14" y="4.5" width="4" height="15" rx="1" fill={color} /></svg>;
+
+const FB_KEYFRAMES = "@keyframes fbPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}@keyframes fbRing{0%{box-shadow:0 0 0 0 rgba(255,50,0,.35)}100%{box-shadow:0 0 0 18px rgba(255,50,0,0)}}@keyframes fbSpin{to{transform:rotate(360deg)}}";
+
+// Colapso sin hueco: la fila de la grilla pasa de 1fr a 0fr.
+function Collapse({ open, children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0, transition: "grid-template-rows .3s ease, opacity .25s ease" }}>
+      <div style={{ overflow: "hidden", minHeight: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+function LevelBars({ t, n = 30, h = 32, color = "var(--ff-red)" }) {
+  return (
+    <div style={{ height: h, display: "flex", alignItems: "center", gap: 3 }}>
+      {Array.from({ length: n }).map((_, i) => {
+        const v = Math.abs(Math.sin(i * 1.3 + t * 5) * Math.cos(i * 0.45 + t * 1.7));
+        return <span key={i} style={{ flex: 1, height: Math.max(3, Math.round(v * h)), borderRadius: 2, background: color, transition: "height .1s linear" }} />;
+      })}
+    </div>
+  );
+}
+
+const WAVE = Array.from({ length: 34 }).map((_, i) => 0.25 + 0.75 * Math.abs(Math.sin(i * 0.9) * Math.cos(i * 0.37 + 1)));
+function ClipPlayer({ len, pos, playing, onToggle }) {
+  const played = len ? pos / len : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--ff-surface-2)", borderRadius: 14, padding: "8px 14px 8px 8px" }}>
+      <button onClick={onToggle} aria-label={playing ? "Pausar" : "Reproducir"} style={{ width: 48, height: 48, borderRadius: "50%", border: "none", background: "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, padding: 0 }}>
+        {playing ? <PauseGlyph color="var(--ff-surface)" /> : <span style={{ marginLeft: 2 }}><PlayGlyph color="var(--ff-surface)" /></span>}
+      </button>
+      <div style={{ flex: 1, height: 28, display: "flex", alignItems: "center", gap: 2 }}>
+        {WAVE.map((v, i) => <span key={i} style={{ flex: 1, height: Math.round(v * 28), borderRadius: 2, background: i / WAVE.length < played ? "var(--ff-text)" : "var(--ff-text-3)", opacity: i / WAVE.length < played ? 1 : 0.5 }} />)}
+      </div>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text-2)", fontVariantNumeric: "tabular-nums", minWidth: 32, textAlign: "right" }}>{fbTime(playing || pos > 0 ? pos : len)}</span>
+    </div>
+  );
+}
+
+function BigAction({ onClick, children, tone = "red", height = 56, disabled }) {
+  const bg = tone === "red" ? "var(--ff-red)" : "transparent";
+  return (
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} style={{ width: "100%", height, borderRadius: 12, border: tone === "red" ? "none" : "1px solid var(--ff-border)", background: bg, color: tone === "red" ? "#fff" : "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer", padding: "0 14px", WebkitTapHighlightColor: "transparent" }}>
+      {children}
+    </button>
+  );
+}
+
+function QuietLink({ onClick, icon, children, disabled }) {
+  return (
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} style={{ height: 44, padding: "0 10px", background: "none", border: "none", cursor: disabled ? "default" : "pointer", display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "var(--font-body)", fontSize: 14, color: disabled ? "var(--ff-text-3)" : "var(--ff-text-2)", opacity: disabled ? 0.6 : 1 }}>
+      {icon ? <FbIcon size={16}>{icon}</FbIcon> : null}{children}
+    </button>
+  );
+}
+
+function FbTextArea({ value, onChange, placeholder, minHeight = 96 }) {
+  const [focus, setFocus] = React.useState(false);
+  return (
+    <textarea value={value} onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder={placeholder}
+      style={{ width: "100%", boxSizing: "border-box", minHeight, resize: "none", borderRadius: 14, border: `1px solid ${focus ? "var(--ff-green)" : "var(--ff-border)"}`, background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 15, lineHeight: 1.45, padding: "12px 14px", outline: "none", transition: "border-color .15s ease" }} />
+  );
+}
+
+function useInterval(active, ms, fn) {
+  const ref = React.useRef(fn); ref.current = fn;
+  React.useEffect(() => { if (!active) return; const id = setInterval(() => ref.current(), ms); return () => clearInterval(id); }, [active, ms]);
+}
+
+// Estado de grabación compartido (tarjeta y pantalla de perfil).
+function useRecorder(initial, { live, offline, micDenied }) {
+  const [s, setS] = React.useState(() => ({ phase: "idle", elapsed: 0, clipLen: 0, playPos: 0, playing: false, text: "", sendFrom: null, prev: null, ...initial }));
+  const set = (p) => setS((o) => ({ ...o, ...(typeof p === "function" ? p(o) : p) }));
+  useInterval(live && s.phase === "recording", 100, () => setS((o) => {
+    const e = o.elapsed + 0.1;
+    return e >= FB_LIMIT ? { ...o, elapsed: FB_LIMIT, clipLen: FB_LIMIT, playPos: 0, phase: "recorded" } : { ...o, elapsed: e };
+  }));
+  useInterval(live && s.playing, 100, () => setS((o) => {
+    const p = o.playPos + 0.1;
+    return p >= o.clipLen ? { ...o, playPos: 0, playing: false } : { ...o, playPos: p };
+  }));
+  React.useEffect(() => {
+    if (!live || s.phase !== "sending") return;
+    const id = setTimeout(() => set({ phase: offline ? "queued" : "sent" }), 1100);
+    return () => clearTimeout(id);
+  }, [live, s.phase, offline]);
+  const api = {
+    start: () => set(micDenied ? { phase: "denied" } : { phase: "recording", elapsed: 0, playPos: 0, playing: false }),
+    stop: () => set((o) => ({ phase: "recorded", clipLen: Math.max(1, o.elapsed), playPos: 0 })),
+    togglePlay: () => set((o) => ({ playing: !o.playing })),
+    send: (from) => set({ phase: "sending", sendFrom: from, playing: false }),
+    setText: (text) => set({ text }),
+  };
+  return [s, set, api];
+}
+
+// Bloque "grabando": indicador, contador, nivel, límite y detener.
+function RecordingBlock({ elapsed, onStop, big }) {
+  const near = elapsed >= FB_WARN;
+  const left = FB_LIMIT - elapsed;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ background: "var(--ff-surface-2)", borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--ff-red)", animation: "fbPulse 1.2s ease-in-out infinite" }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-red-light)" }}>Grabando</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: big ? 34 : 28, fontWeight: 600, color: "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+            {fbTime(elapsed)}{near ? <span style={{ fontSize: 15, fontWeight: 400, color: "var(--ff-text-3)" }}> / {fbTime(FB_LIMIT)}</span> : null}
+          </span>
+        </div>
+        <LevelBars t={elapsed} />
+        <div style={{ height: 4, borderRadius: 2, background: "var(--ff-border)", overflow: "hidden" }}>
+          <div style={{ width: `${Math.min(100, (elapsed / FB_LIMIT) * 100)}%`, height: "100%", background: near ? "var(--ff-section-stripset)" : "var(--ff-red)", transition: "width .1s linear" }} />
+        </div>
+        {near ? <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0, textAlign: "right" }}>Quedan {Math.ceil(left)} s</p> : null}
+      </div>
+      <BigAction onClick={onStop} height={big ? 60 : 56}><StopGlyph />Toca para detener</BigAction>
+    </div>
+  );
+}
+
+function DeniedBlock({ onWrite, compact }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", background: "var(--ff-surface-2)", borderRadius: 14, padding: 14 }}>
+        <span style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ff-text-2)", flexShrink: 0 }}><FbIcon size={18}>{IC.micOff}</FbIcon></span>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 3px" }}>Sin acceso al micrófono</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0, lineHeight: 1.45, textWrap: "pretty" }}>Actívalo en los ajustes del teléfono o escribe tu respuesta.</p>
+        </div>
+      </div>
+      <BigAction onClick={onWrite}><FbIcon size={18} color="#fff">{IC.text}</FbIcon>Escribir respuesta</BigAction>
+      {compact ? null : <div style={{ display: "flex", justifyContent: "center" }}><QuietLink>Abrir ajustes</QuietLink></div>}
+    </div>
+  );
+}
+
+function SendRow({ left, disabled, loading, onSend }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1.3fr)", gap: 10 }}>
+      {left}
+      <Button variant="primary" loading={loading} disabled={disabled} onClick={onSend} style={{ height: 52 }}>{loading ? "Enviando…" : "Enviar"}</Button>
+    </div>
+  );
+}
+
+// ── 1 · Tarjeta de feedback (Resumen post-workout) ─────────────────────────
+const RATINGS = [
+  { key: "mejor", label: "Mejor", icon: IC.up },
+  { key: "igual", label: "Igual", icon: IC.equal },
+  { key: "peor", label: "Peor", icon: IC.down },
+];
+
+function FeedbackCard({ initial = {}, live, offline, micDenied, question = FB_QUESTION }) {
+  const [rating, setRating] = React.useState(initial.rating || null);
+  const [s, set, api] = useRecorder(initial, { live, offline, micDenied });
+  const collapsed = s.phase === "sent" || s.phase === "queued" || s.phase === "skipped";
+  const view = s.phase === "sending" ? s.sendFrom : s.phase;
+  const skip = () => set((o) => ({ prev: o.phase === "recording" ? "idle" : o.phase, phase: "skipped", playing: false }));
+
+  let composer;
+  if (view === "recording") composer = <RecordingBlock elapsed={s.elapsed} onStop={api.stop} />;
+  else if (view === "recorded") composer = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ClipPlayer len={s.clipLen} pos={s.playPos} playing={s.playing} onToggle={api.togglePlay} />
+      <SendRow loading={s.phase === "sending"} disabled={!rating} onSend={() => api.send("recorded")}
+        left={<BigAction tone="ghost" height={52} onClick={api.start}><FbIcon size={16}>{IC.redo}</FbIcon>Repetir</BigAction>} />
+    </div>
+  );
+  else if (view === "text") composer = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <FbTextArea value={s.text} onChange={api.setText} placeholder="Escribe tu respuesta" />
+      <SendRow loading={s.phase === "sending"} disabled={!s.text.trim() || !rating} onSend={() => api.send("text")}
+        left={<BigAction tone="ghost" height={52} onClick={() => set({ phase: "idle" })}><FbIcon size={16}>{IC.mic}</FbIcon>Usar voz</BigAction>} />
+    </div>
+  );
+  else if (view === "denied") composer = <DeniedBlock compact onWrite={() => set({ phase: "text" })} />;
+  else composer = (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      <BigAction onClick={api.start}><FbIcon size={20} color="#fff">{IC.mic}</FbIcon>Toca para grabar</BigAction>
+      <QuietLink onClick={() => set({ phase: "text" })}>Prefiero escribir</QuietLink>
+      <div style={{ alignSelf: "stretch", height: 1, background: "var(--ff-border)", margin: "12px 0 4px" }} />
+      <QuietLink disabled={!rating} onClick={skip}>Enviar feedback sin responder</QuietLink>
+    </div>
+  );
+
+  const done = {
+    sent: { icon: IC.check, tint: "rgba(46,207,122,0.14)", color: "var(--ff-green)", title: "¡Gracias!", body: "Tu opinión nos ayuda a mejorar la app." },
+    queued: { icon: IC.clock, tint: "var(--ff-surface-2)", color: "var(--ff-text-2)", title: "Guardado", body: "Lo enviaremos cuando tengas conexión." },
+    skipped: { icon: IC.check, tint: "rgba(46,207,122,0.14)", color: "var(--ff-green)", title: "Guardamos tu valoración", body: "Si quieres contarnos más, está en tu perfil.", undo: true },
+  }[s.phase];
+
+  return (
+    <div data-fb-card style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+      <style>{FB_KEYFRAMES}</style>
+      <Collapse open={!collapsed}>
+        <div style={{ padding: "8px 16px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44 }}>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: 0 }}>Tu opinión</p>
+            <Badge tone="accent">Beta</Badge>
+            <span style={{ flex: 1 }} />
+          </div>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", lineHeight: 1.4, margin: "2px 0 6px", letterSpacing: "-.2px", textWrap: "pretty" }}>Estás construyendo la nueva FitFighters</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.45, margin: 0, textWrap: "pretty" }}>Gracias por ser parte de la beta. Lo que nos cuentes decide qué mejoramos. Son dos preguntas, menos de 2 minutos.</p>
+          <div style={{ height: 1, background: "var(--ff-border)", margin: "16px -16px 14px" }} />
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.35, margin: "0 0 12px", textWrap: "pretty" }}>Comparada con la app anterior, el entrenamiento de hoy se sintió…</p>
+          <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
+            {RATINGS.map((r) => {
+              const on = rating === r.key;
+              return (
+                <button key={r.key} role="radio" aria-checked={on} onClick={() => setRating(r.key)} style={{ height: 64, borderRadius: 12, border: `1.5px solid ${on ? "var(--ff-red)" : "var(--ff-border)"}`, background: on ? "var(--ff-primary-container)" : "var(--ff-surface-2)", color: on ? "var(--ff-red-light)" : "var(--ff-text)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", padding: 0, transition: "background .15s ease, border-color .15s ease", WebkitTapHighlightColor: "transparent" }}>
+                  <FbIcon size={18} sw={2.2}>{on ? IC.check : r.icon}</FbIcon>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 12 }}>{r.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ height: 1, background: "var(--ff-border)", margin: "16px -16px 14px" }} />
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.35, margin: "0 0 14px", textWrap: "pretty" }}>{question}</p>
+          {composer}
+        </div>
+      </Collapse>
+      <Collapse open={collapsed}>
+        {done ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 12px 12px 16px", minHeight: 64, boxSizing: "border-box" }}>
+            <span style={{ width: 36, height: 36, borderRadius: "50%", background: done.tint, color: done.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><FbIcon size={18} sw={2.4}>{done.icon}</FbIcon></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>{done.title}</p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "1px 0 0", lineHeight: 1.4 }}>{done.body}</p>
+            </div>
+            {done.undo ? <button onClick={() => set((o) => ({ phase: o.prev || "idle" }))} style={{ height: 44, padding: "0 10px", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-red-light)", flexShrink: 0 }}>Deshacer</button> : null}
+          </div>
+        ) : <div style={{ height: 64 }} />}
+      </Collapse>
+    </div>
+  );
+}
+
+function FbCircleBtn({ kind = "back", onClick, plain }) {
+  return (
+    <button onClick={onClick} aria-label={kind === "close" ? "Cerrar" : "Atrás"} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: plain ? "transparent" : "var(--ff-surface-2)", padding: 0 }}>
+      <FbIcon size={20} color="var(--ff-text)">{kind === "close" ? IC.close : IC.back}</FbIcon>
+    </button>
+  );
+}
+
+function useBarScrollFb() {
+  const [scrolled, setScrolled] = React.useState(false);
+  const onScroll = (e) => { const v = e.currentTarget.scrollTop > 6; setScrolled((p) => (p === v ? p : v)); };
+  return [scrolled, onScroll];
+}
+function FbTopBar({ title, onBack, onClose, scrolled }) {
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", background: scrolled ? "var(--ff-bg)" : "transparent", borderBottom: scrolled ? "1px solid var(--ff-border)" : "1px solid transparent", transition: "background .2s ease, border-color .2s ease" }}>
+      {onBack ? <FbCircleBtn kind="back" onClick={onBack} plain={scrolled} /> : <span style={{ width: 40 }} />}
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.2px", opacity: scrolled ? 1 : 0, transition: "opacity .2s ease", whiteSpace: "nowrap" }}>{title}</span>
+      {onClose ? <FbCircleBtn kind="close" onClick={onClose} plain={scrolled} /> : <span style={{ width: 40 }} />}
+    </div>
+  );
+}
+
+// ── 3 · Pantalla de feedback (desde Perfil): voz y texto con el mismo peso ──
+function ModeSwitch({ mode, onChange, disabled }) {
+  const opts = [{ key: "voice", label: "Voz", icon: IC.mic }, { key: "text", label: "Texto", icon: IC.text }];
+  return (
+    <div role="tablist" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 4, background: "var(--ff-surface-2)", border: "1px solid var(--ff-border)", borderRadius: 14, opacity: disabled ? 0.55 : 1 }}>
+      {opts.map((o) => {
+        const on = mode === o.key;
+        return (
+          <button key={o.key} role="tab" aria-selected={on} onClick={disabled ? undefined : () => onChange(o.key)} style={{ height: 44, borderRadius: 10, border: on ? "1px solid var(--ff-border)" : "1px solid transparent", background: on ? "var(--ff-surface)" : "transparent", color: on ? "var(--ff-text)" : "var(--ff-text-2)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "var(--font-display)", fontSize: 12, cursor: disabled ? "default" : "pointer" }}>
+            <FbIcon size={16}>{o.icon}</FbIcon>{o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FeedbackScreen({ theme = "light", initial = {}, live, offline, micDenied, onBack = () => {} }) {
+  const [mode, setMode] = React.useState(initial.mode || "voice");
+  const [s, set, api] = useRecorder(initial, { live, offline, micDenied });
+  const [scrolled, onScroll] = useBarScrollFb();
+  const done = s.phase === "sent" || s.phase === "queued";
+  const sending = s.phase === "sending";
+  const canSend = mode === "voice" ? (s.phase === "recorded" || (sending && s.sendFrom === "voice")) : s.text.trim().length > 0;
+  const vPhase = sending ? "recorded" : s.phase;
+
+  let panel;
+  if (mode === "text") {
+    panel = <FbTextArea value={s.text} onChange={api.setText} placeholder="Escribe aquí" minHeight={220} />;
+  } else if (vPhase === "denied") {
+    panel = <DeniedBlock onWrite={() => { setMode("text"); set({ phase: "idle" }); }} />;
+  } else if (vPhase === "recording") {
+    panel = <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: 14 }}><RecordingBlock big elapsed={s.elapsed} onStop={api.stop} /></div>;
+  } else if (vPhase === "recorded") {
+    panel = (
+      <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+        <ClipPlayer len={s.clipLen} pos={s.playPos} playing={s.playing} onToggle={api.togglePlay} />
+        {sending ? null : <div style={{ display: "flex", justifyContent: "center" }}><QuietLink icon={IC.redo} onClick={api.start}>Volver a grabar</QuietLink></div>}
+      </div>
+    );
+  } else {
+    panel = (
+      <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "30px 16px 22px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <button onClick={api.start} aria-label="Grabar" style={{ width: 88, height: 88, borderRadius: "50%", border: "none", background: "var(--ff-red)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+          <FbIcon size={34} color="#fff">{IC.mic}</FbIcon>
+        </button>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>Toca para grabar</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: "2px 0 0" }}>Hasta {fbTime(FB_LIMIT)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (done) {
+    const q = s.phase === "queued";
+    return (
+      <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...fbTheme(theme) }} data-screen-label={q ? "Feedback · en cola" : "Feedback · enviado"}>
+        <style>{FB_KEYFRAMES}</style>
+        <FbTopBar title="Enviar feedback" onBack={onBack} scrolled={false} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px 120px", textAlign: "center" }}>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: q ? "var(--ff-surface-2)" : "rgba(46,207,122,0.12)", border: q ? "1px solid var(--ff-border)" : "none", color: q ? "var(--ff-text-2)" : "var(--ff-green)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+            <FbIcon size={34} sw={2.4}>{q ? IC.clock : IC.check}</FbIcon>
+          </div>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: "0 0 10px", letterSpacing: "-.3px" }}>{q ? "Guardado" : "¡Gracias!"}</h1>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 15, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, maxWidth: 270, textWrap: "pretty" }}>{q ? "Lo enviaremos cuando tengas conexión. No tienes que hacer nada más." : "Leemos cada mensaje. Tu opinión nos ayuda a mejorar la app."}</p>
+        </div>
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 20px 28px" }}>
+          <Button variant="primary" onClick={onBack}>Volver al perfil</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...fbTheme(theme) }} data-screen-label="Feedback">
+      <style>{FB_KEYFRAMES}</style>
+      <FbTopBar title="Enviar feedback" onBack={onBack} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "64px 16px 120px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ padding: "8px 2px 0", display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
+          <Badge tone="accent">Beta</Badge>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: 0, letterSpacing: "-.3px" }}>Enviar feedback</h1>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 16, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>{FB_OPEN_Q}</p>
+        </div>
+        <ModeSwitch mode={mode} disabled={s.phase === "recording" || sending} onChange={(m) => { setMode(m); set({ playing: false }); }} />
+        {panel}
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 20px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" loading={sending} disabled={!canSend || s.phase === "recording"} onClick={() => api.send(mode)}>{sending ? "Enviando…" : "Enviar"}</Button>
+      </div>
+    </div>
+  );
+}
+
+
+window.FeedbackCard = FeedbackCard;
+window.FeedbackScreen = FeedbackScreen;
+
 // ── Summary.jsx ─────────────────────────────────────────────────
 // FitFighters mobile — Workout summary.
 
@@ -3553,11 +3953,16 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function SummaryScreen({ onHome, onMilestone }) {
+function SummaryScreen({ onHome, onMilestone, feedback = {}, focusFeedback, feedbackLive = true, offline, micDenied }) {
   const s = window.FF_DATA.summary;
+  const scrollRef = React.useRef(null);
+  const cardRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    if (focusFeedback && scrollRef.current && cardRef.current) scrollRef.current.scrollTop = cardRef.current.offsetTop - 16;
+  }, [focusFeedback]);
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Resumen">
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 110 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", paddingBottom: 110, position: "relative" }}>
       {/* Hero */}
       <div style={{ position: "relative", height: 190, overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,50,0,.12) 0%, rgba(255,154,60,.08) 55%, rgba(46,207,122,.07) 100%)" }} />
@@ -3578,6 +3983,9 @@ function SummaryScreen({ onHome, onMilestone }) {
           <p style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ff-red)", margin: "0 0 2px" }}>Rutina completada</p>
           <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0 }}>¡Excelente trabajo, sigue así!</p>
         </div>
+
+        {/* Feedback beta */}
+        <div ref={cardRef}><FeedbackCard initial={feedback} live={feedbackLive} offline={offline} micDenied={micDenied} /></div>
 
         {/* Total time */}
         <div style={{ background: "var(--ff-surface)", borderRadius: 16, padding: 20, border: "1px solid var(--ff-border)" }}>
@@ -4280,6 +4688,7 @@ function App() {
     chat:              () => { setTab("chat"); setScreen("chat"); },
     aiChat:            () => setScreen("aiChat"),
     editProfile:       () => setScreen("editProfile"),
+    feedback:          () => setScreen("feedback"),
     language:          () => setScreen("language"),
     changePassword:    () => setScreen("changePassword"),
     changeProgram:     () => setScreen("changeProgram"),
@@ -4338,7 +4747,10 @@ function App() {
       body = <ChangeExerciseScreen exercise={activeExercise?.ex} onBack={() => setScreen("exerciseDetail")} onConfirm={onExerciseChanged} />;
       break;
     case "profile":
-      body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} lang={lang} onLanguage={nav.language} onGenerations={nav.generationHistory} />;
+      body = <ProfileScreen tab={tab} onClose={nav.workout} onTab={onTab} onEditProfile={nav.editProfile} onChangePassword={nav.changePassword} onChangeProgram={nav.changeProgram} lang={lang} onLanguage={nav.language} onGenerations={nav.generationHistory} onFeedback={nav.feedback} />;
+      break;
+    case "feedback":
+      body = <FeedbackScreen live onBack={nav.profile} />;
       break;
     case "chat":
       body = <ChatHomeScreen onOpenAI={nav.aiChat} onTab={(t) => (t === "workout" ? nav.workout() : nav.chat())} />;
@@ -4514,7 +4926,17 @@ function Catalog() {
     {
       title: "Fin de rutina",
       cells: [
-        { label: "Resumen", el: <SummaryScreen onHome={noop} onMilestone={noop} /> },
+        { label: "Resumen", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} /> },
+        { label: "Feedback beta", note: "Rating elegido", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor" }} /> },
+        { label: "Feedback beta", note: "Grabando · tap para iniciar y detener", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 24 }} /> },
+        { label: "Feedback beta", note: "Grabando · cerca del límite de 1:30", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recording", elapsed: 78 }} /> },
+        { label: "Feedback beta", note: "Grabación lista", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "recorded", clipLen: 42, playPos: 15 }} /> },
+        { label: "Feedback beta", note: "Enviando", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sending", sendFrom: "recorded", clipLen: 42 }} /> },
+        { label: "Feedback beta", note: "Modo texto", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "igual", phase: "text", text: "Al terminar la serie no encontré dónde pasar al siguiente ejercicio." }} /> },
+        { label: "Feedback beta", note: "Enviado · la tarjeta colapsa", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "sent" }} /> },
+        { label: "Feedback beta", note: "Sin conexión · en cola", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "queued" }} /> },
+        { label: "Feedback beta", note: "Enviar sin responder · solo rating", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "skipped", prev: "idle" }} /> },
+        { label: "Feedback beta", note: "Micrófono denegado", el: <SummaryScreen onHome={noop} onMilestone={noop} feedbackLive={false} focusFeedback feedback={{ rating: "mejor", phase: "denied" }} /> },
         { label: "Logro desbloqueado", el: <MilestoneScreen onClose={noop} /> },
         { label: "Logro", note: "Compartir", el: <MilestoneScreen initialShareOpen={true} onClose={noop} /> },
       ],
@@ -4523,6 +4945,14 @@ function Catalog() {
       title: "Perfil y cuenta",
       cells: [
         { label: "Perfil", note: "Modal de abajo hacia arriba: cierre a la derecha", el: <ProfileScreen tab="profile" onClose={noop} onTab={noop} onEditProfile={noop} onChangePassword={noop} onChangeProgram={noop} onGenerations={noop} /> },
+        { label: "Enviar feedback", note: "Beta · inicial", el: <FeedbackScreen initial={{ mode: "voice" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Grabando", el: <FeedbackScreen initial={{ mode: "voice", phase: "recording", elapsed: 37 }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Grabación lista", el: <FeedbackScreen initial={{ mode: "voice", phase: "recorded", clipLen: 64, playPos: 22 }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Escribiendo", el: <FeedbackScreen initial={{ mode: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Enviando", el: <FeedbackScreen initial={{ mode: "text", phase: "sending", sendFrom: "text", text: "Me gusta que el entrenador cuente las reps. Echo de menos ver el siguiente ejercicio antes de terminar la serie." }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Enviado", el: <FeedbackScreen initial={{ phase: "sent" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Sin conexión · en cola", el: <FeedbackScreen initial={{ phase: "queued" }} onBack={noop} /> },
+        { label: "Enviar feedback", note: "Micrófono denegado", el: <FeedbackScreen initial={{ mode: "voice", phase: "denied" }} onBack={noop} /> },
         { label: "Idioma", note: "Se aplica al tocar; sin botón de guardar", el: <LanguageScreen lang="es" onBack={noop} /> },
         { label: "Editar perfil", el: <EditProfileScreen onBack={noop} /> },
         { label: "Cambiar contraseña", el: <ChangePasswordScreen onBack={noop} /> },
@@ -4534,7 +4964,7 @@ function Catalog() {
       cells: [
         { label: "Cambiar plan", note: "Lista", el: <ChangeProgramScreen initialView="list" onBack={noop} onConfirm={noop} /> },
         { label: "Cambiar plan", note: "Filtros en hoja inferior", el: <ChangeProgramScreen initialView="list" initialFilterOpen onBack={noop} onConfirm={noop} /> },
-        { label: "Cambiar días de entrenamiento", note: "Con di\u00e1logo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar días de entrenamiento", note: "Con diálogo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Suscrito", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Plan free", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} plan="free" onBack={noop} onConfirm={noop} /> },
       ],
