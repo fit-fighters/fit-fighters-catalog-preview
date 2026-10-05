@@ -1131,8 +1131,8 @@ function MaskIcon({ name, resKey, size = 20, color = "#fff", src }) {
 }
 
 // Encabezado del programa sin imagen: la foto se reserva para la rutina.
-function ProgramHeaderFlat() {
-  const p = window.FF_DATA.program;
+function ProgramHeaderFlat({ prog }) {
+  const p = prog || window.FF_DATA.program;
   return (
     <div style={{ padding: "0 18px 16px" }}>
       <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>{p.generation}</p>
@@ -1142,9 +1142,19 @@ function ProgramHeaderFlat() {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "16px 0 8px" }}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)" }}>Semana {p.week} de {p.totalWeeks}</span>
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text)" }}>{p.userProgress}% de tu plan</span>
       </div>
       <DualProgressBar user={p.userProgress} plan={p.planProgress} />
+      {/* Leyenda: distingue tu progreso (rojo) del avance del plan (rojo tenue). Aprobado 3 oct 2026. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--ff-red)", flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text)" }}>Tu progreso {p.userProgress}%</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "rgba(255,50,0,0.28)", flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)" }}>Avance del plan {p.planProgress}%</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1378,22 +1388,153 @@ function WeekPill({ week, onClick }) {
   );
 }
 
-function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, sheetOpen }) {
-  const p = window.FF_DATA.program;
+// Anuncios del home (aprobado 3a): el backend entrega una imagen ya diseñada (2.3:1).
+// Card más del home bajo el programa: radio 16, borde hairline, cerrar arriba a la derecha.
+// Imágenes de demostración; se reemplazan por las reales del backend.
+const HOME_ADS = [
+  { img: "assets/ad_semana6.png", title: "Semana 6", text: "Los detalles que separan a quien hace la rutina del que la sabe aprovechar" },
+  { img: "assets/ad_demo_programa.png", title: "Nuevo programa", text: "Hipertrofia Science V3 ya disponible" },
+  { img: "assets/ad_demo_reto.png", title: "Reto de octubre", text: "20 rutinas en 30 días. ¿Te sumas?" },
+];
+
+// Carrusel infinito: avanza solo cada 10 s y siempre hacia la derecha. Tras el último
+// hay una copia del primero; al llegar a ella se salta sin animación al original.
+// Deslizar a mano también funciona y reinicia el temporizador.
+function useAdLoop(n, interval = 10000) {
+  const [i, setI] = React.useState(0);
+  const [anim, setAnim] = React.useState(true);
+  React.useEffect(() => {
+    if (n < 2) return;
+    const t = setTimeout(() => { setAnim(true); setI((x) => x + 1); }, interval);
+    return () => clearTimeout(t);
+  }, [i, n, interval]);
+  const onEnd = () => { if (i >= n) { setAnim(false); setI(0); } };
+  const next = () => { setAnim(true); setI((x) => Math.min(x + 1, n)); };
+  const prev = () => {
+    if (i > 0) { setAnim(true); setI(i - 1); return; }
+    setAnim(false); setI(n);
+    requestAnimationFrame(() => requestAnimationFrame(() => { setAnim(true); setI(n - 1); }));
+  };
+  const go = (k) => { setAnim(true); setI(k); };
+  return { i, active: n ? i % n : 0, anim, onEnd, next, prev, go };
+}
+
+function AdDots({ n, active, onPick }) {
+  if (n < 2) return null;
+  return (
+    <div style={{ display: "flex", justifyContent: "center", gap: 6, height: 20, alignItems: "center" }}>
+      {Array.from({ length: n }, (_, k) => (
+        <button key={k} aria-label={`Anuncio ${k + 1}`} onClick={() => onPick(k)} style={{ width: k === active ? 16 : 6, height: 6, borderRadius: 3, border: "none", padding: 0, cursor: "pointer", background: k === active ? "var(--ff-red)" : "var(--ff-text-3)", opacity: k === active ? 1 : 0.4, transition: "width .3s ease, background .3s ease" }} />
+      ))}
+    </div>
+  );
+}
+
+function AdTrack({ ads, loop, renderSlide }) {
+  const n = ads.length;
+  const slides = n > 1 ? [...ads, ads[0]] : ads;
+  const start = React.useRef(null);
+  return (
+    <div style={{ overflow: "hidden", touchAction: "pan-y" }}
+      onPointerDown={(e) => { start.current = e.clientX; }}
+      onPointerUp={(e) => { if (start.current == null || n < 2) return; const dx = e.clientX - start.current; start.current = null; if (dx < -40) loop.next(); else if (dx > 40) loop.prev(); }}>
+      <div onTransitionEnd={loop.onEnd} style={{ display: "flex", transform: `translateX(-${loop.i * 100}%)`, transition: loop.anim ? "transform 600ms cubic-bezier(.4,0,.2,1)" : "none" }}>
+        {slides.map((ad, k) => <div key={k} style={{ flex: "0 0 100%", minWidth: 0 }}>{renderSlide(ad)}</div>)}
+      </div>
+    </div>
+  );
+}
+
+function AdCloseBtn({ onClick }) {
+  return (
+    <button aria-label="Cerrar anuncio" onClick={(e) => { e.stopPropagation(); onClick(); }} style={{ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+      <span style={{ width: 28, height: 28, borderRadius: 999, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+      </span>
+    </button>
+  );
+}
+
+function AdCard({ ads, onClose }) {
+  const loop = useAdLoop(ads.length);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", border: "1px solid var(--ff-border)", background: "#0F0F0F" }}>
+        <AdTrack ads={ads} loop={loop} renderSlide={(ad) => (
+          <div role="button" onClick={() => {}} style={{ position: "relative", aspectRatio: "588 / 256", cursor: "pointer" }}>
+            <img src={ad.img} alt={ad.title} draggable="false" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+        )} />
+        <div style={{ position: "absolute", top: 2, right: 2 }}><AdCloseBtn onClick={onClose} /></div>
+      </div>
+      <AdDots n={ads.length} active={loop.active} onPick={loop.go} />
+    </div>
+  );
+}
+
+// Fin del plan (aprobado 5 oct 2026, 5c + 5d): solo en la última semana.
+// Si quedan rutinas, fila al final de la lista; si ya no queda ninguna, card plana en el lugar de hoy.
+// Ambas abren WhatsApp con el coach (en la app real: intent a https://wa.me/<phone>).
+function PlanEndRow({ p, onOpen }) {
+  return (
+    <div onClick={onOpen} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, cursor: "pointer" }}>
+      <span style={{ width: 66, height: 66, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#1FA855" }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path fillRule="evenodd" d={APP_WA_D} /></svg>
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>Fin del plan · semana {p.totalWeeks}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Aquí cierras este plan</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>Escríbele a tu coach para lo que sigue</p>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: 4 }}><polyline points="9 18 15 12 9 6" /></svg>
+    </div>
+  );
+}
+
+function PlanEndCard({ p, onOpen }) {
+  return (
+    <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
+          <img src={window.__resources?.ffMark || "assets/logos/ff_mark.svg"} alt="" style={{ width: 22 }} />
+        </span>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-red-light)", textTransform: "uppercase", letterSpacing: ".12em", margin: 0 }}>Última semana · {p.totalWeeks} de {p.totalWeeks}</p>
+      </div>
+      <div>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.25, margin: "0 0 8px" }}>Aquí cierras este plan</h2>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0 }}>{p.totalWeeks} semanas de constancia ya se notan. Escríbele a tu coach para revisar juntos tu avance y preparar tu siguiente plan.</p>
+      </div>
+      <button onClick={onOpen} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "#1FA855", color: "#fff", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path fillRule="evenodd" d={APP_WA_D} /></svg>
+        Escribirle a mi coach
+      </button>
+    </div>
+  );
+}
+
+function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, sheetOpen, lastWeek, planFinished }) {
+  const [adOpen, setAdOpen] = React.useState(true);
+  const base = window.FF_DATA.program;
+  // lastWeek / planFinished: solo para mostrar el estado en el catálogo.
+  const p = lastWeek ? { ...base, week: base.totalWeeks, userProgress: 85, planProgress: 92 } : base;
+  const onLastWeek = p.week === p.totalWeeks;
   const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter(b => b.type !== "rest").length;
   const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
   const template = window.FF_DATA.weekTemplate || [];
   const todayIdx = Math.max(0, template.findIndex(x => x.status === "today"));
   // Solo las rutinas por realizar, de hoy en adelante, con su fecha real.
   const upcoming = [];
-  for (let offset = (todayRest || todayDone) ? 1 : 0; upcoming.length < 6 && offset < 21; offset++) {
+  // En la última semana la lista termina con el plan (no hay rutinas después).
+  const maxOffset = onLastWeek ? template.length - todayIdx : 21;
+  for (let offset = (todayRest || todayDone) ? 1 : 0; upcoming.length < 6 && offset < maxOffset; offset++) {
     const i = todayIdx + offset;
     const item = template[i % template.length];
     if (item.type === "rest") continue;
     upcoming.push({ ...item, date: formatShortDate(p.weekStartDate, i), status: offset === 0 ? "today" : "upcoming" });
   }
   const first = upcoming[0];
-  const rest = (todayRest || todayDone) ? upcoming : upcoming.slice(1);
+  const rest = planFinished ? [] : (todayRest || todayDone) ? upcoming : upcoming.slice(1);
+  const noMore = onLastWeek && (planFinished || ((todayRest || todayDone) && rest.length === 0));
   const todayDate = formatShortDate(p.weekStartDate, todayIdx);
   const todayName = (template[todayIdx] || {}).day;
   const doneRoutine = ((template[todayIdx] || {}).routine) || (first && first.routine);
@@ -1411,8 +1552,9 @@ function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, she
       </header>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 20px" }}>
         <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "16px 0 18px", marginBottom: 12 }}>
-          <ProgramHeaderFlat />
+          <ProgramHeaderFlat prog={p} />
         </div>
+        {adOpen && HOME_ADS.length > 0 && <div style={{ marginBottom: 12 }}><AdCard ads={HOME_ADS} onClose={() => setAdOpen(false)} /></div>}
         <div style={{ marginBottom: 18 }}>
           <PendingRow onOpen={() => {}} note={todayDone && isCurrent ? "La rutina de hoy ya está guardada aquí" : undefined} />
         </div>
@@ -1427,6 +1569,8 @@ function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, she
               {weekRoutines.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
               <button onClick={() => setWeek(p.week)} style={{ marginTop: 4, height: 44, borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Volver a la semana actual</button>
             </React.Fragment>
+          ) : noMore ? (
+            <PlanEndCard p={p} onOpen={() => {}} />
           ) : todayDone ? (
             <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <img src="assets/entrenamiento_completado.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1471,8 +1615,9 @@ function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, she
             </div>
           </div>
           )}
-          {isCurrent && <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "8px 2px 0" }}>Tus próximas rutinas</p>}
+          {isCurrent && !noMore && <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "8px 2px 0" }}>Tus próximas rutinas</p>}
           {isCurrent && rest.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
+          {isCurrent && onLastWeek && !noMore && <PlanEndRow p={p} onOpen={() => {}} />}
         </div>
       </div>
       <TwoTabBar active="workout" tone="dark" onChange={() => {}} />
@@ -4882,6 +5027,8 @@ function Catalog() {
         { label: "Workout", note: "Hoy es descanso", el: <WorkoutListScreen onSelectDay={noop} todayRest /> },
         { label: "Workout", note: "Selector de semana abierto", el: <WorkoutListScreen onSelectDay={noop} sheetOpen /> },
         { label: "Workout", note: "Viendo otra semana", el: <WorkoutListScreen onSelectDay={noop} initialWeek={4} /> },
+        { label: "Workout", note: "Última semana · fin del plan al final", el: <WorkoutListScreen onSelectDay={noop} lastWeek /> },
+        { label: "Workout", note: "Última semana · sin rutinas por hacer", el: <WorkoutListScreen onSelectDay={noop} lastWeek todayDone planFinished /> },
         { label: "Workout", note: "Sin plan cargado", el: <WorkoutEmptyScreen onStartTutorial={noop} /> },
         { label: "Rutinas anteriores", note: "Completadas y pendientes", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} /> },
         { label: "Rutinas anteriores", note: "Hoy completada · acciones de la fila", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} todayDone demoMenu /> },
@@ -4956,7 +5103,7 @@ function Catalog() {
       cells: [
         { label: "Cambiar plan", note: "Lista", el: <ChangeProgramScreen initialView="list" onBack={noop} onConfirm={noop} /> },
         { label: "Cambiar plan", note: "Filtros en hoja inferior", el: <ChangeProgramScreen initialView="list" initialFilterOpen onBack={noop} onConfirm={noop} /> },
-        { label: "Cambiar días de entrenamiento", note: "Con diálogo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
+        { label: "Cambiar días de entrenamiento", note: "Con di\u00e1logo de alcance", el: <ChangeProgramScreen initialView="changeDays" initialScopeDialogOpen={true} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Suscrito", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} onBack={noop} onConfirm={noop} /> },
         { label: "Detalle de plan", note: "Plan free", el: <ChangeProgramScreen initialView="detail" initialSelectedId={4} plan="free" onBack={noop} onConfirm={noop} /> },
       ],
