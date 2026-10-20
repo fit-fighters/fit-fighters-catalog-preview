@@ -380,9 +380,11 @@ window.FF_DATA = {
     description: "Desbloqueaste un nuevo sticker en Hipertrofia FUNDAMENTOS (GYM).",
   },
 
+  // stickers: { key, sticker_url } tal como responde el backend; newKeys = aún no vistos.
   generations: [
-    { id: 2, name: "Generación 2", progress: 42,  date: "28 ago 2023", method: "Crédito", reviewAsked: true,  fbGroup: false },
-    { id: 1, name: "Generación 1", progress: 100, date: "15 ene 2023", method: "Stripe",  reviewAsked: true,  fbGroup: true  },
-    { id: 0, name: "Generación 0", progress: 100, date: "1 ago 2022",  method: "Stripe",  reviewAsked: false, fbGroup: false },
+    { id: 4, name: "Generación 4", status: "upcoming", startDate: "12 ene 2027" },
+    { id: 3, name: "Generación 3", status: "current", progress: 35, date: "8 sep 2026", endDate: "1 dic 2026", stickers: [{ key: "first_routine", sticker_url: null }, { key: "ten_percent_completed", sticker_url: null }, { key: "twenty_percent_completed", sticker_url: null }, { key: "thirty_percent_completed", sticker_url: null }], newKeys: ["thirty_percent_completed"] },
+    { id: 2, name: "Generación 2", status: "past", progress: 68, date: "28 ago 2025", endDate: "20 nov 2025", stickers: [{ key: "first_routine", sticker_url: null }, { key: "ten_percent_completed", sticker_url: null }, { key: "twenty_percent_completed", sticker_url: null }, { key: "thirty_percent_completed", sticker_url: null }, { key: "fifty_percent_completed", sticker_url: null }] },
+    { id: 1, name: "Generación 1", status: "past", progress: 100, date: "15 ene 2025", endDate: "9 abr 2025", stickers: [{ key: "first_routine", sticker_url: null }, { key: "ten_percent_completed", sticker_url: null }, { key: "twenty_percent_completed", sticker_url: null }, { key: "thirty_percent_completed", sticker_url: null }, { key: "fifty_percent_completed", sticker_url: null }, { key: "seventy_percent_completed", sticker_url: null }, { key: "generation_completed", sticker_url: null }] },
   ],
 };

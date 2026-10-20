@@ -709,7 +709,66 @@ function ExerciseDescriptionView({ desc }) {
   return null;
 }
 
+// Ejercicios por lado (aprobado 20 oct 2026): ex.bilateral = "pierna" | "brazo" | "lado".
+// Se hace primero el lado izquierdo y luego el derecho, sin descanso entre lados.
+const BI_SIDES = ["izq", "der"];
+function biSides(ex) { return ex && ex.bilateral ? BI_SIDES : [null]; }
+function biSideFull(limb, s) {
+  if (limb === "pierna") return s === "izq" ? "Pierna izquierda" : "Pierna derecha";
+  if (limb === "brazo") return s === "izq" ? "Brazo izquierdo" : "Brazo derecho";
+  return s === "izq" ? "Lado izquierdo" : "Lado derecho";
+}
+
+// Detalle: el ejercicio aparece una vez por lado, cada renglón etiquetado con su lado.
+function BilateralExerciseRows({ ex, isLast, onTap }) {
+  return (
+    <div>
+      {BI_SIDES.map((s, k) => (
+        <div key={s} onClick={onTap} style={{ display: "flex", alignItems: "center", gap: 12, padding: k ? "7px 16px 13px" : "13px 16px 7px", cursor: onTap ? "pointer" : "default" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
+            {ex.img ? <img src={ex.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-red-light)" }}>{biSideFull(ex.bilateral, s)}</span>
+            <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", lineHeight: 1.3, marginTop: 3 }}>{ex.name}</span>
+          </div>
+          <ExerciseDescriptionView desc={ex.desc} />
+        </div>
+      ))}
+      {ex.rest && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: "var(--ff-surface-2)", borderTop: "1px solid var(--ff-border)", borderBottom: "1px solid var(--ff-border)" }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Descanso</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-text-2)" }}>{ex.rest}</span>
+        </div>
+      )}
+      {!isLast && !ex.rest && <div style={{ borderTop: "1px solid var(--ff-border)" }} />}
+    </div>
+  );
+}
+
+// Entrenador: lado en curso relleno en blanco, el anterior con check, la flecha marca el orden.
+function BiSideTrack({ limb, side }) {
+  const pill = (s) => {
+    const cur = s === side;
+    const done = side === "der" && s === "izq";
+    return (
+      <span key={s} style={{ display: "flex", alignItems: "center", gap: 5, height: 26, padding: "0 11px", borderRadius: 999, boxSizing: "border-box", fontFamily: "var(--font-body)", fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", background: cur ? "#fff" : "transparent", color: cur ? "#0B0B0B" : "rgba(255,255,255,.55)", border: "1px solid " + (cur ? "#fff" : "rgba(255,255,255,.22)") }}>
+        {done ? <R6Icon size={11} stroke="rgba(255,255,255,.7)" w={3}><polyline points="20 6 9 17 4 12" /></R6Icon> : null}
+        {biSideFull(limb, s)}
+      </span>
+    );
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {pill("izq")}
+      <R6Icon size={13} stroke="rgba(255,255,255,.45)" w={2.2}><polyline points="9 18 15 12 9 6" /></R6Icon>
+      {pill("der")}
+    </div>
+  );
+}
+
 function RoutineExerciseRow({ ex, isLast, onTap }) {
+  if (ex.bilateral) return <BilateralExerciseRows ex={ex} isLast={isLast} onTap={onTap} />;
   return (
     <div>
       <div onClick={onTap} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", cursor: onTap ? "pointer" : "default" }}>
@@ -1472,48 +1531,166 @@ function AdCard({ ads, onClose }) {
   );
 }
 
-// Fin del plan (aprobado 5 oct 2026, 5c + 5d): solo en la última semana.
-// Si quedan rutinas, fila al final de la lista; si ya no queda ninguna, card plana en el lugar de hoy.
-// Ambas abren WhatsApp con el coach (en la app real: intent a https://wa.me/<phone>).
-function PlanEndRow({ p, onOpen }) {
+
+// ── Avisos del home (aprobado 9 oct 2026, 6a) ──────────────────────
+// Fila al inicio de "Tus próximas rutinas"; el aviso completo vive en una hoja inferior.
+// El backend manda a lo más un aviso. Nunca hablan de pagos ni inscripciones:
+// lo comercial se resuelve hablando con el coach por WhatsApp.
+// Tonos = colores de sección del DS. "ink" es la versión oscurecida para texto/ícono
+// sobre blanco (AA); en oscuro se usa el color de sección tal cual.
+const NOTICE_TONES = {
+  green: { accent: "#2ECF7A", inkLight: "#12804A", inkDark: "#2ECF7A" },
+  blue: { accent: "#4DA6FF", inkLight: "#1F6FC4", inkDark: "#4DA6FF" },
+  purple: { accent: "#C77DFF", inkLight: "#8A3FD1", inkDark: "#C77DFF" },
+  orange: { accent: "#FF9A3C", inkLight: "#B35600", inkDark: "#FF9A3C" },
+  red: { accent: "#FF3200", inkLight: "#D62A00", inkDark: "#FF6A40" },
+};
+const NOTICES = {
+  next_plan_ready: { code: "B1", tone: "green", icon: "calCheck", title: "Tu nuevo plan ya está listo", rowSub: "Cámbiate cuando termines el actual", body: "Ya cargamos tu siguiente plan. Cuando hayas terminado tus entrenamientos del plan actual, puedes cambiarte al nuevo desde aquí.", callout: "Importante: al cambiarte a tu nuevo plan, dejarás de tener acceso al plan actual.", cta: { kind: "primary", label: "Cambiar a mi nuevo plan", loading: "Cargando tu plan…" } },
+  next_plan_reserved: { code: "B2", tone: "blue", icon: "cal", title: "Tu plan ya está apartado", rowSub: "Podrás verlo en {d} días", body: "Tu plan de la próxima generación ya está cargado.", chip: "Faltan {d} días para que puedas ver tu plan.", foot: "Te avisaremos cuando puedas acceder a él." },
+  next_plan_available: { code: "B3", tone: "purple", icon: "rocket", title: "Tu nuevo plan ya está disponible", rowSub: "Actívalo o se carga solo el lunes", body: "Ya puedes cargar tu nuevo plan. Si lo activas ahora, dejarás de tener acceso a tu plan gratuito actual. Si no haces nada, se cargará automáticamente el lunes.", cta: { kind: "primary", label: "Cargar mi nuevo plan", loading: "Cargando tu plan…" } },
+  plan_ending: { code: "B4", tone: "orange", icon: "users", title: "Tu plan termina este domingo", rowSub: "Escríbele a tu coach para lo que sigue", body: "Lo que construiste estas semanas merece continuidad. Escríbele a tu coach y define con él tu siguiente paso.", cta: { kind: "wa", label: "Hablar con mi coach" } },
+  enrollment: { code: "B5", tone: "red", icon: "compass", title: "Descubre más de Fit Fighters", rowSub: "Tu coach te orienta por WhatsApp", body: "Un plan a tu medida y un coach que sigue tu avance. Escríbele por WhatsApp y te orienta para que saques el máximo provecho a tu entrenamiento.", cta: { kind: "wa", label: "Hablar con mi coach" } },
+};
+const NOTICE_KEYS = Object.keys(NOTICES);
+const nText = (s, d) => (s || "").replace("{d}", d);
+
+function NIcon({ name, size = 24, color = "currentColor", sw = 2 }) {
+  const P = {
+    calCheck: <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><polyline points="9 16 11 18 15 14" /></>,
+    cal: <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+    rocket: <><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></>,
+    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    compass: <><circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" /></>,
+    bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>,
+    alert: <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></>,
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{P[name]}</svg>;
+}
+
+const NOTICE_KF = <style>{"@keyframes ffSpin{to{transform:rotate(360deg)}}@keyframes ffPulse{0%,100%{opacity:1}50%{opacity:.45}}"}</style>;
+
+function NoticeCta({ cta, scale = 1, loading, onClick }) {
+  const fs = (n) => n * scale;
+  const wa = cta.kind === "wa";
   return (
-    <div onClick={onOpen} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, cursor: "pointer" }}>
-      <span style={{ width: 66, height: 66, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#1FA855" }}>
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="#fff"><path fillRule="evenodd" d={APP_WA_D} /></svg>
-      </span>
+    <button onClick={onClick} disabled={loading} aria-busy={loading ? "true" : undefined} style={{ width: "100%", minHeight: 48, padding: "10px 14px", borderRadius: 10, border: "none", background: wa ? "#1FA855" : "var(--ff-red)", opacity: loading ? 0.85 : 1, color: "#fff", fontFamily: "var(--font-display)", fontSize: fs(14), letterSpacing: "-.2px", lineHeight: 1.3, cursor: loading ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, textAlign: "center" }}>
+      {NOTICE_KF}
+      {loading ? <span style={{ width: 16, height: 16, borderRadius: 999, border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#fff", animation: "ffSpin .8s linear infinite", flexShrink: 0 }} /> : wa ? <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" style={{ flexShrink: 0 }}><path fillRule="evenodd" d={APP_WA_D} /></svg> : null}
+      {loading ? cta.loading : cta.label}
+    </button>
+  );
+}
+
+// Contenido completo de un aviso. framed = card (spec / feed expandido); sin framed vive dentro de la hoja.
+function NoticeBody({ n, dark, scale = 1, days = 12, loading, onCta, framed }) {
+  const t = NOTICE_TONES[n.tone];
+  const ink = dark ? t.inkDark : t.inkLight;
+  const fs = (v) => v * scale;
+  const tint = `color-mix(in srgb, ${t.accent} ${dark ? 14 : 12}%, transparent)`;
+  const orange = NOTICE_TONES.orange;
+  const inner = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <span style={{ width: 48, height: 48, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", background: tint }}><NIcon name={n.icon} color={ink} /></span>
+      <div>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: fs(17), color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.3, margin: "0 0 8px", textWrap: "pretty" }}>{n.title}</h2>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: fs(13.5), color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0, textWrap: "pretty" }}>{n.body}</p>
+      </div>
+      {n.chip && (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 14px", borderRadius: 14, background: tint }}>
+          <NIcon name="clock" size={18} color={ink} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: fs(13), fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.45 }}>{nText(n.chip, days)}</span>
+        </div>
+      )}
+      {n.foot && <p style={{ fontFamily: "var(--font-body)", fontSize: fs(12.5), color: "var(--ff-text-3)", lineHeight: 1.5, margin: 0 }}>{n.foot}</p>}
+      {n.callout && (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 14px", borderRadius: 12, background: `color-mix(in srgb, ${orange.accent} ${dark ? 12 : 10}%, transparent)`, border: `1px solid color-mix(in srgb, ${orange.accent} 30%, transparent)` }}>
+          <NIcon name="alert" size={18} color={dark ? orange.inkDark : orange.inkLight} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: fs(12.5), color: "var(--ff-text)", lineHeight: 1.5 }}>{n.callout}</span>
+        </div>
+      )}
+      {n.cta && <NoticeCta cta={n.cta} scale={scale} loading={loading} onClick={onCta} />}
+    </div>
+  );
+  if (!framed) return inner;
+  return <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "18px 18px 18px" }}>{inner}</div>;
+}
+
+// Solo catálogo: desplaza el teléfono hasta la fila para que se vea sin hacer scroll.
+function useNoticeFocus(on) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!on || !ref.current) return;
+    let el = ref.current.parentElement;
+    while (el && getComputedStyle(el).overflowY !== "auto") el = el.parentElement;
+    if (el) el.scrollTop = Math.max(0, ref.current.offsetTop - el.offsetTop - 260);
+  }, [on]);
+  return ref;
+}
+
+// Fila con la misma forma que RoutineListItem; tocarla abre la hoja.
+function NoticeRow({ n, dark, days = 12, onOpen, focus }) {
+  const ref = useNoticeFocus(focus);
+  const t = NOTICE_TONES[n.tone];
+  const ink = dark ? t.inkDark : t.inkLight;
+  return (
+    <div ref={ref} role="button" onClick={onOpen} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, cursor: "pointer" }}>
+      <span style={{ width: 66, height: 66, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `color-mix(in srgb, ${t.accent} 12%, transparent)` }}><NIcon name={n.icon} size={28} color={ink} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>Fin del plan · semana {p.totalWeeks}</p>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Aquí cierras este plan</p>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>Escríbele a tu coach para lo que sigue</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: ink, textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>Aviso</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", lineHeight: 1.3 }}>{n.title}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0 }}>{nText(n.rowSub, days)}</p>
       </div>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: 4 }}><polyline points="9 18 15 12 9 6" /></svg>
     </div>
   );
 }
 
-function PlanEndCard({ p, onOpen }) {
+function NoticeSkeleton({ kind = "row", focus }) {
+  const ref = useNoticeFocus(focus);
+  const bar = (w, h = 10) => <span style={{ display: "block", width: w, height: h, borderRadius: 4, background: "var(--ff-surface-2)" }} />;
+  if (kind === "row") return (
+    <div ref={ref} aria-label="Cargando aviso" style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, animation: "ffPulse 1.4s ease-in-out infinite" }}>
+      {NOTICE_KF}
+      <span style={{ width: 66, height: 66, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0 }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>{bar(44, 8)}{bar("78%", 12)}{bar("55%")}</div>
+    </div>
+  );
   return (
-    <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
-          <img src={window.__resources?.ffMark || "assets/logos/ff_mark.svg"} alt="" style={{ width: 22 }} />
-        </span>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-red-light)", textTransform: "uppercase", letterSpacing: ".12em", margin: 0 }}>Última semana · {p.totalWeeks} de {p.totalWeeks}</p>
-      </div>
-      <div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.25, margin: "0 0 8px" }}>Aquí cierras este plan</h2>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0 }}>{p.totalWeeks} semanas de constancia ya se notan. Escríbele a tu coach para revisar juntos tu avance y preparar tu siguiente plan.</p>
-      </div>
-      <button onClick={onOpen} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "#1FA855", color: "#fff", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path fillRule="evenodd" d={APP_WA_D} /></svg>
-        Escribirle a mi coach
-      </button>
+    <div aria-label="Cargando aviso" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 18, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, animation: "ffPulse 1.4s ease-in-out infinite" }}>
+      {NOTICE_KF}
+      <span style={{ width: 48, height: 48, borderRadius: 13, background: "var(--ff-surface-2)" }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{bar("70%", 14)}{bar("100%")}{bar("85%")}</div>
+      <span style={{ height: 48, borderRadius: 10, background: "var(--ff-surface-2)" }} />
     </div>
   );
 }
 
-function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, sheetOpen, lastWeek, planFinished }) {
+// Hoja inferior del aviso. El CTA de B1/B3 pasa a "Cargando tu plan…" al tocarlo.
+function NoticeSheet({ n, days = 12, onClose, demoLoading }) {
+  const [loading, setLoading] = React.useState(!!demoLoading);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", maxHeight: "85%", overflowY: "auto" }}>
+        <div style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)", margin: "0 auto 16px" }} />
+        {n ? <NoticeBody n={n} days={days} loading={loading} onCta={() => n.cta && n.cta.kind === "primary" && setLoading(true)} /> : (
+          <div style={{ padding: "8px 0 12px" }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>Sin avisos por ahora</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0 }}>Cuando tu coach o tu plan tengan algo para ti, lo verás aquí.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, sheetOpen, lastWeek, planFinished, notice, noticeLoading, noticeOpen, noticeDemoLoading, noticeFocus }) {
   const [adOpen, setAdOpen] = React.useState(true);
+  // notice: clave del aviso que manda el backend (o null). Nunca hay más de uno.
+  const [nOpen, setNOpen] = React.useState(!!noticeOpen);
+  const nData = notice && NOTICES[notice];
   const base = window.FF_DATA.program;
   // lastWeek / planFinished: solo para mostrar el estado en el catálogo.
   const p = lastWeek ? { ...base, week: base.totalWeeks, userProgress: 85, planProgress: 92 } : base;
@@ -1569,8 +1746,6 @@ function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, she
               {weekRoutines.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
               <button onClick={() => setWeek(p.week)} style={{ marginTop: 4, height: 44, borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Volver a la semana actual</button>
             </React.Fragment>
-          ) : noMore ? (
-            <PlanEndCard p={p} onOpen={() => {}} />
           ) : todayDone ? (
             <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <img src="assets/entrenamiento_completado.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
@@ -1616,12 +1791,14 @@ function WorkoutListScreen({ onSelectDay, todayRest, todayDone, initialWeek, she
           </div>
           )}
           {isCurrent && !noMore && <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "8px 2px 0" }}>Tus próximas rutinas</p>}
+          {isCurrent && noticeLoading && <NoticeSkeleton kind="row" focus={noticeFocus} />}
+          {isCurrent && !noticeLoading && nData && <NoticeRow n={nData} focus={noticeFocus} onOpen={() => setNOpen(true)} />}
           {isCurrent && rest.map((item, i) => <RoutineListItem key={i} item={item} mins={mins} blocks={blockCount} onOpen={() => onSelectDay && onSelectDay(item)} />)}
-          {isCurrent && onLastWeek && !noMore && <PlanEndRow p={p} onOpen={() => {}} />}
         </div>
       </div>
       <TwoTabBar active="workout" tone="dark" onChange={() => {}} />
       {sheet && <WeekSheet p={p} value={week} onPick={(w) => { setWeek(w); setSheet(false); }} onClose={() => setSheet(false)} />}
+      {nOpen && nData && <NoticeSheet n={nData} demoLoading={noticeDemoLoading} onClose={() => setNOpen(false)} />}
     </div>
   );
 }
@@ -2131,7 +2308,7 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
         <Card padding="0" style={{ marginTop: 12 }}>
           <MenuRow
             icon={ProfileIcon(<><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></>)}
-            label="Generaciones anteriores"
+            label="Mis generaciones"
             onClick={onGenerations}
           />
         </Card>
@@ -3240,11 +3417,11 @@ function R6QueueSheet({ groups, currentIdx, closedIds, onToggleGroup, onClose, o
   );
 }
 
-function R6Countdown({ n, name }) {
+function R6Countdown({ n, name, title = "Prepárate" }) {
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 240, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 20, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Prepárate</span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{title}</span>
         <span style={{ fontFamily: "var(--font-display)", fontSize: 72, lineHeight: 1.1, color: "var(--ff-red)" }}>{n}</span>
         {name && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", textAlign: "center" }}>{name}</span>}
       </div>
@@ -3256,14 +3433,14 @@ function r6Steps(block) {
   if (block.type === "rest") return [{ rest: true, seconds: block.timeSeconds, ex: { img: block.img, name: "Descanso" } }];
   if (block.type === "cycle") {
     const out = [];
-    for (let s = 1; s <= (block.series || 1); s++) (block.exercises || []).forEach((ex) => out.push({ ex, serie: s }));
+    for (let s = 1; s <= (block.series || 1); s++) (block.exercises || []).forEach((ex) => biSides(ex).forEach((side) => out.push({ ex, serie: s, side })));
     return out;
   }
   if (block.type === "stripset") {
-    return (block.exercises || []).flatMap((ex) => (ex.sequence || [ex.reps]).map((reps, i) => ({ ex, reps, drop: i + 1, drops: (ex.sequence || []).length })));
+    return (block.exercises || []).flatMap((ex) => (ex.sequence || [ex.reps]).flatMap((reps, i) => biSides(ex).map((side) => ({ ex, reps, side, drop: i + 1, drops: (ex.sequence || []).length }))));
   }
   if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv, i) => ({ ex: iv, seconds: iv.workSeconds, ivIdx: i }));
-  if (block.exercises) return block.exercises.map((ex) => ({ ex }));
+  if (block.exercises) return block.exercises.flatMap((ex) => biSides(ex).map((side) => ({ ex, side })));
   if (block.exercise) return [{ ex: block.exercise, seconds: block.type === "cardio" ? block.totalTimeSeconds : null, reps: block.repsInitial }];
   return [];
 }
@@ -3280,7 +3457,7 @@ function r6HeroLegacy(block, step) {
 
 function r6SectionExercises(block) {
   if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo · ${iv.restSeconds}s descanso` }));
-  if (block.exercises) return block.exercises.map((ex) => ({ name: ex.name, img: ex.img, meta: ex.sequence ? ex.sequence.join(" · ") + " reps" : ex.reps ? `${ex.reps} reps` : ex.timeSeconds ? fmtCountdown(ex.timeSeconds) : "Al fallo" }));
+  if (block.exercises) return block.exercises.map((ex) => ({ name: ex.name, img: ex.img, meta: (ex.sequence ? ex.sequence.join(" · ") + " reps" : ex.reps ? `${ex.reps} reps` : ex.timeSeconds ? fmtCountdown(ex.timeSeconds) : "Al fallo") + (ex.bilateral ? " por lado" : "") }));
   if (block.exercise) return [{ name: block.exercise.name, img: block.exercise.img, meta: block.type === "emom" ? `${block.repsInitial} reps al minuto` : fmtCountdown(block.totalTimeSeconds || 0) }];
   return [];
 }
@@ -3417,8 +3594,8 @@ function R7Stat({ value, label }) {
   );
 }
 
-function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish }) {
-  const blocks = window.FF_DATA.trainerBlocks || [];
+function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish }) {
+  const blocks = blocksOverride || window.FF_DATA.trainerBlocks || [];
   // EMOM: un solo ejercicio que se repite cada minuto. No hay pasos que saltar, así que
   // atrás/siguiente se retiran y en su lugar queda una acción explícita de finalizar sección.
   const isEmom = (blocks[blockIdx] || {}).type === "emom";
@@ -3432,7 +3609,7 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
   const [groups, setGroups] = React.useState(() => r6Groups(blocks));
   const [elapsed, setElapsed] = React.useState(724);
   const [preroll, setPreroll] = React.useState(showPreroll ? 3 : null);
-  const [clockSecs, setClockSecs] = React.useState(() => { const c = r6ClockBase((window.FF_DATA.trainerBlocks || [])[blockIdx] || {}); return c ? c.secs : 0; });
+  const [clockSecs, setClockSecs] = React.useState(() => { const c = r6ClockBase(blocks[blockIdx] || {}); return c ? c.secs : 0; });
   const touchY = React.useRef(null);
 
   const block = blocks[bIdx] || blocks[0];
@@ -3481,6 +3658,7 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
     const n = sIdx + d;
     if (n < 0 || n >= steps.length) return;
     setSIdx(n);
+    if (live && d > 0 && steps[n].side === "der" && steps[n].ex === step.ex) setPreroll(3);
   };
 
   const sec = SECTION_TYPES[block.type] || SECTION_TYPES.cycle;
@@ -3499,6 +3677,8 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
     if (sIdx + 1 < steps.length) {
       const ns = steps[sIdx + 1];
       const nh = r6HeroLegacy(block, ns);
+      // Cambio de lado: mismo ejercicio, sin descanso de por medio.
+      if (ns.side && ns.ex === step.ex) return { title: `Cambia a ${biSideFull(ns.ex.bilateral, ns.side).toLowerCase()}`, img: ns.ex.img };
       if (block.restBetweenSeconds) return { title: `Descanso ${fmtCountdown(block.restBetweenSeconds)}`, sub: `Luego: ${ns.ex.name}`, img: ns.ex.img, rest: true };
       return { title: ns.ex.name, sub: nh.kind === "time" ? fmtCountdown(nh.seconds) : nh.kind === "reps" ? `${nh.value} reps` : "Al fallo", img: ns.ex.img };
     }
@@ -3539,6 +3719,7 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}>
             <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: 0, lineHeight: 1.35, textAlign: "center", letterSpacing: "-.3px", textWrap: "pretty" }}>{curName}</p>
+            {step.side && block.type !== "rest" && <BiSideTrack limb={(step.ex || {}).bilateral} side={step.side} />}
             {muscles.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
                 {muscles.map((m) => (
@@ -3638,7 +3819,7 @@ function TrainerImmersiveScreen({ blockIdx = 0, stepIdx = 0, queueOpen = false, 
             onClose={() => { setQueue(false); setFinished(false); }} onReorder={setGroups} finish={finished} onFinish={onFinish} />
         </div>
       )}
-      {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={curName} /></div>}
+      {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={step.side ? `${biSideFull((step.ex || {}).bilateral, step.side)} · ${curName}` : curName} title={step.side === "der" ? "Cambia de lado" : "Prepárate"} /></div>}
       {intro && (
         <div style={{ position: "absolute", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "rgba(0,0,0,.72)", ...R7_SHEET }}>
           <div style={{ width: "100%", background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: 16, padding: "20px 18px 18px" }}>
@@ -4607,96 +4788,348 @@ function StatusPill({ yes }) {
   );
 }
 
-// ── Generation Detail ──────────────────────────────────────────────────────────
-function GenerationDetailView({ gen, onBack }) {
-  const [scrolled, onScroll] = useBarScroll();
-  return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Detalle de generación">
-      <FloatingTopBar title={gen.name} onBack={onBack} scrolled={scrolled} />
+// ── Mis generaciones · stickers (aprobado) ─────────────────────────────────────
+// La lista incluye la actual y las próximas. El detalle muestra los stickers que entrega
+// el backend (key + sticker_url). Las 7 etapas son fijas, así que las no desbloqueadas
+// se muestran bloqueadas con su umbral.
+const STICKER_STAGES = [
+  { key: "first_routine", name: "Primera rutina", short: "1ª", at: 1 },
+  { key: "ten_percent_completed", name: "10% completado", short: "10%", at: 10 },
+  { key: "twenty_percent_completed", name: "20% completado", short: "20%", at: 20 },
+  { key: "thirty_percent_completed", name: "30% completado", short: "30%", at: 30 },
+  { key: "fifty_percent_completed", name: "Mitad del camino", short: "50%", at: 50 },
+  { key: "seventy_percent_completed", name: "70% completado", short: "70%", at: 70 },
+  { key: "generation_completed", name: "Generación completada", short: "100%", at: 100 },
+];
 
-      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "60px 16px 32px" }}>
-        {/* Hero card */}
-        <div style={{ background: "var(--ff-surface)", borderRadius: 20, border: "1px solid var(--ff-border)", padding: "20px 16px", display: "flex", alignItems: "center", gap: 16, marginBottom: 4 }}>
-          <div style={{ width: 72, height: 72, borderRadius: 14, background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <GenStackIcon size={32} />
+function genStages(gen) {
+  const list = gen.stickers || [];
+  return STICKER_STAGES.map((st, i) => {
+    const hit = list.find((s) => s.key === st.key);
+    return { ...st, idx: i, unlocked: !!hit, url: hit ? hit.sticker_url : null, isNew: (gen.newKeys || []).includes(st.key) };
+  });
+}
+function stickerCopy(s, gen) {
+  if (s.key === "first_routine") return "Completaste tu primera rutina de " + gen.name + ".";
+  if (s.key === "generation_completed") return "Terminaste " + gen.name + " de principio a fin.";
+  return "Llegaste al " + s.at + "% de " + gen.name + ".";
+}
+function StkLock({ size = 18 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>;
+}
+const STK_MARK_URL = "_ds/fitfighters-design-system-4614fc49-0cd8-4497-8045-bc5ba2b985be/assets/logos/ff_mark_white.svg";
+function StkMark({ size, color }) {
+  return <span style={{ width: size, height: size, display: "block", background: color, WebkitMaskImage: "url(" + STK_MARK_URL + ")", maskImage: "url(" + STK_MARK_URL + ")", WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" }} />;
+}
+// Placeholder del sticker_url: disco de marca con la etapa. Con url real se pinta la imagen.
+function StickerMedal({ s, size = 64 }) {
+  if (!s.unlocked) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: "50%", boxSizing: "border-box", border: "1.5px dashed var(--ff-border)", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {size >= 36 ? <StkLock size={Math.round(size * 0.3)} /> : <StkMark size={Math.round(size * 0.5)} color="var(--ff-text-3)" />}
+      </div>
+    );
+  }
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      {s.url ? <img src={s.url} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : (
+        <div style={{ width: "100%", height: "100%", borderRadius: "50%", background: "var(--ff-red)", boxShadow: "inset 0 0 0 " + Math.max(2, Math.round(size * 0.05)) + "px rgba(255,255,255,.3)", border: size < 36 ? "2px solid var(--ff-surface)" : "none", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: Math.round(size * 0.22), color: "#fff", letterSpacing: "-.5px" }}>{size >= 36 ? s.short : <StkMark size={Math.round(size * 0.5)} color="#fff" />}</div>
+      )}
+      {s.isNew && size >= 36 ? <span style={{ position: "absolute", left: "50%", bottom: -6, transform: "translateX(-50%)", fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#fff", background: "#141414", border: "2px solid var(--ff-surface)", borderRadius: 999, padding: "1px 7px" }}>Nuevo</span> : null}
+    </div>
+  );
+}
+function StkGenIcon({ size = 24, kind }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      {kind === "upcoming"
+        ? <g><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></g>
+        : <g><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></g>}
+    </svg>
+  );
+}
+function StkGenTile({ size = 56, kind }) {
+  return <div style={{ width: size, height: size, borderRadius: 12, background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><StkGenIcon size={Math.round(size * 0.43)} kind={kind} /></div>;
+}
+function StkBar({ value, done }) {
+  return (
+    <div style={{ height: 6, borderRadius: 3, background: "var(--ff-surface-2)", overflow: "hidden", width: "100%" }}>
+      <div style={{ height: "100%", width: Math.min(value, 100) + "%", background: done ? "var(--ff-green)" : "var(--ff-red)", borderRadius: 3 }} />
+    </div>
+  );
+}
+const STK_CHEVRON = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>;
+
+function MyGenerationsScreen({ generations = window.FF_DATA.generations || [], onBack, onOpen }) {
+  const [scrolled, onScroll] = useBarScroll();
+  const current = generations.find((g) => g.status === "current");
+  const upcoming = generations.filter((g) => g.status === "upcoming");
+  const past = generations.filter((g) => g.status === "past");
+  const rowText = { fontFamily: "var(--font-body)", fontSize: 16, color: "var(--ff-text)", margin: 0 };
+  const subText = { fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "2px 0 0" };
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Mis generaciones">
+      <FloatingTopBar title="Mis generaciones" onBack={onBack} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "64px 16px 32px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 2px 0" }}>Mis generaciones</p>
+
+        {current ? (() => {
+          const st = genStages(current);
+          const got = st.filter((s) => s.unlocked);
+          const fresh = st.filter((s) => s.isNew).length;
+          return (
+            <div>
+              <ProfileSectionLabel>Actual</ProfileSectionLabel>
+              <Card padding="0" style={{ borderColor: "rgba(46,207,122,0.35)" }}>
+                <button onClick={() => onOpen && onOpen(current)} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 14, padding: 16, background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}>
+                    <StkGenTile />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <p style={rowText}>{current.name}</p>
+                        <Badge tone="active" dot>Actual</Badge>
+                      </div>
+                      <p style={subText}>Desde {current.date}</p>
+                    </div>
+                    {STK_CHEVRON}
+                  </div>
+                  <div style={{ width: "100%" }}>
+                    <StkBar value={current.progress} />
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: "6px 0 0" }}>{current.progress}% completado</p>
+                  </div>
+                  <div style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, paddingTop: 12, borderTop: "1px solid var(--ff-border)" }}>
+                    <div style={{ display: "flex" }}>
+                      {st.map((s, i) => <div key={s.key} style={{ marginLeft: i ? -6 : 0 }}><StickerMedal s={s} size={24} /></div>)}
+                    </div>
+                    <span style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>{got.length} de {st.length} stickers</span>
+                    {fresh ? <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "#fff", background: "var(--ff-red)", borderRadius: 999, padding: "3px 9px" }}>{fresh} {fresh === 1 ? "nuevo" : "nuevos"}</span> : null}
+                  </div>
+                </button>
+              </Card>
+            </div>
+          );
+        })() : null}
+
+        {upcoming.length ? (
+          <div>
+            <ProfileSectionLabel>Próximas</ProfileSectionLabel>
+            <Card padding="0">
+              {upcoming.map((g, i) => (
+                <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderTop: i ? "1px solid var(--ff-border)" : "none" }}>
+                  <StkGenTile kind="upcoming" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={rowText}>{g.name}</p>
+                    <p style={subText}>Inicia el {g.startDate}</p>
+                  </div>
+                  <Badge>Próxima</Badge>
+                </div>
+              ))}
+            </Card>
           </div>
+        ) : null}
+
+        {past.length ? (
+          <div>
+            <ProfileSectionLabel>Anteriores</ProfileSectionLabel>
+            <Card padding="0">
+              {past.map((g, i) => {
+                return (
+                  <button key={g.id} onClick={() => onOpen && onOpen(g)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", background: "transparent", border: "none", borderTop: i ? "1px solid var(--ff-border)" : "none", cursor: "pointer", textAlign: "left" }}>
+                    <StkGenTile />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={rowText}>{g.name}</p>
+                      <p style={subText}>{g.progress}% completado · {g.date}</p>
+                    </div>
+                    {STK_CHEVRON}
+                  </button>
+                );
+              })}
+            </Card>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function StkDetailRow({ label, right, last }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: last ? "none" : "0.5px solid var(--ff-border)" }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)" }}>{label}</span>
+      {right}
+    </div>
+  );
+}
+function StkYesNo({ yes }) {
+  return <span style={{ fontFamily: "var(--font-body)", fontSize: 12, padding: "3px 10px", borderRadius: 20, fontWeight: 500, background: yes ? "rgba(46,207,122,0.12)" : "rgba(255,92,92,0.10)", color: yes ? "var(--ff-green)" : "var(--ff-error)", border: "0.5px solid " + (yes ? "rgba(46,207,122,.25)" : "rgba(255,92,92,.2)") }}>{yes ? "Sí" : "No"}</span>;
+}
+
+function GenerationStickersDetail({ gen, onBack, onSticker }) {
+  const [scrolled, onScroll] = useBarScroll();
+  const st = genStages(gen);
+  const got = st.filter((s) => s.unlocked).length;
+  const isCurrent = gen.status === "current";
+  const next = isCurrent ? st.find((s) => !s.unlocked) : null;
+  const done = got === st.length;
+  const label = { fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)", letterSpacing: ".08em", textTransform: "uppercase", margin: 0 };
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Detalle de generación · stickers">
+      <FloatingTopBar title={gen.name} onBack={onBack} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "60px 16px 32px" }}>
+        <div style={{ background: "var(--ff-surface)", borderRadius: 20, border: "1px solid var(--ff-border)", padding: "20px 16px", display: "flex", alignItems: "center", gap: 16 }}>
+          <StkGenTile size={72} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", margin: "0 0 10px" }}>{gen.name}</p>
-            <GenProgressBar value={gen.progress} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 10px" }}>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", margin: 0 }}>{gen.name}</p>
+              {isCurrent ? <Badge tone="active" dot>Actual</Badge> : null}
+            </div>
+            <StkBar value={gen.progress} done={gen.progress >= 100} />
             <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: "5px 0 0" }}>{gen.progress}% completado</p>
           </div>
         </div>
 
-        {/* Suscripción */}
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)", padding: "18px 0 8px", letterSpacing: ".08em", textTransform: "uppercase", margin: 0 }}>Suscripción</p>
-        <div style={{ background: "var(--ff-surface)", borderRadius: 14, border: "1px solid var(--ff-border)", overflow: "hidden" }}>
-          <GenDetailRow label="Fecha" right={<span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--ff-text)" }}>{gen.date}</span>} />
-          <GenDetailRow label="Método" right={<span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--ff-text)" }}>{gen.method}</span>} last />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 0 8px" }}>
+          <p style={label}>Stickers</p>
+          {done ? <Badge tone="active" dot>Colección completa</Badge> : <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text)" }}>{got} de {st.length}</span>}
         </div>
 
-        {/* Participación */}
-        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)", padding: "18px 0 8px", letterSpacing: ".08em", textTransform: "uppercase", margin: 0 }}>Participación</p>
+        {next ? (
+          <Card style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, marginBottom: 10 }}>
+            <StickerMedal s={next} size={52} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: 0 }}>Siguiente sticker</p>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: "4px 0 10px" }}>{next.name}</p>
+              <StkBar value={(gen.progress / next.at) * 100} />
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: "6px 0 0" }}>{next.key === "first_routine" ? "Completa tu primera rutina para desbloquearlo" : "Te falta " + (next.at - gen.progress) + "% para desbloquearlo"}</p>
+            </div>
+          </Card>
+        ) : null}
+
+        <Card style={{ padding: "20px 12px 18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "22px 4px" }}>
+            {st.map((s) => (
+              <button key={s.key} disabled={!s.unlocked} onClick={() => s.unlocked && onSticker && onSticker(s.key)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: "transparent", border: "none", padding: 0, cursor: s.unlocked ? "pointer" : "default" }}>
+                <StickerMedal s={s} size={60} />
+                <span style={{ fontFamily: "var(--font-body)", fontSize: 11, lineHeight: 1.25, textAlign: "center", color: s.unlocked ? "var(--ff-text)" : "var(--ff-text-3)", textWrap: "balance" }}>{s.name}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+        {got ? <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", textAlign: "center", margin: "10px 0 0" }}>Toca un sticker para verlo y compartirlo</p> : null}
+
+        <p style={{ ...label, padding: "18px 0 8px" }}>Detalle de la generación</p>
         <div style={{ background: "var(--ff-surface)", borderRadius: 14, border: "1px solid var(--ff-border)", overflow: "hidden" }}>
-          <GenDetailRow label="Reseña solicitada" right={<StatusPill yes={gen.reviewAsked} />} />
-          <GenDetailRow label="Grupo de Facebook" right={<StatusPill yes={gen.fbGroup} />} last />
+          <StkDetailRow label="Fecha de inicio" right={<span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--ff-text)" }}>{gen.date}</span>} />
+          <StkDetailRow label="Fecha de finalización" right={<span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 500, color: "var(--ff-text)" }}>{gen.endDate}</span>} last />
         </div>
       </div>
     </div>
   );
 }
 
-// ── Generation History list ────────────────────────────────────────────────────
-function GenerationHistoryScreen({ onBack, generationsOverride = null, initialSelectedId = "__none__" }) {
-  const [scrolled, onScroll] = useBarScroll();
-  const generations = generationsOverride !== null ? generationsOverride : window.FF_DATA.generations;
-  const [selected, setSelected] = React.useState(
-    initialSelectedId === "__none__" ? null : generations.find(g => g.id === initialSelectedId) || null
-  );
+const STK_SHARE_OPTIONS = [
+  { label: "WhatsApp", bg: "#128C7E", icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M11.997 2C6.477 2 2 6.477 2 11.997c0 1.99.584 3.84 1.588 5.39L2 22l4.734-1.558A9.935 9.935 0 0011.997 22C17.517 22 22 17.523 22 12.003 22 6.477 17.517 2 11.997 2z"/></svg> },
+  { label: "Instagram", bg: "linear-gradient(135deg,#F58529,#DD2A7B,#515BD4)", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="white" /></svg> },
+  { label: "X", bg: "#000", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.742l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63z"/></svg> },
+  { label: "Copiar", bg: "var(--ff-surface-2)", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-2)" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg> },
+];
 
-  if (selected) {
-    return <GenerationDetailView gen={selected} onBack={() => setSelected(null)} />;
-  }
-
+// Visor del sticker: misma hoja que "Logro desbloqueado", recorriendo los desbloqueados.
+function StickerSheetScreen({ gen, startKey, initialShareOpen = false, onClose }) {
+  const list = genStages(gen).filter((s) => s.unlocked);
+  const [i, setI] = React.useState(Math.max(0, list.findIndex((s) => s.key === startKey)));
+  const [shareOpen, setShareOpen] = React.useState(initialShareOpen);
+  const s = list[i];
+  if (!s) return null;
+  const arrow = (dir) => {
+    const off = dir < 0 ? i === 0 : i === list.length - 1;
+    return (
+      <button aria-label={dir < 0 ? "Anterior" : "Siguiente"} disabled={off} onClick={() => setI(i + dir)} style={{ position: "absolute", top: "50%", [dir < 0 ? "left" : "right"]: 10, transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", border: "none", background: "var(--ff-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text)" strokeWidth="2.2" strokeLinecap="round">{dir < 0 ? <polyline points="15 18 9 12 15 6" /> : <polyline points="9 18 15 12 9 6" />}</svg>
+      </button>
+    );
+  };
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Generaciones">
-      <FloatingTopBar title="Generaciones" onBack={onBack} scrolled={scrolled} />
-
-      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingTop: 56 }}>
-        {generations.length === 0 ? (
-          // Empty state
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <GenStackIcon size={28} />
-            </div>
-            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0, textAlign: "center" }}>Sin historial</p>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0, textAlign: "center", padding: "0 32px" }}>Aquí aparecerán tus generaciones anteriores.</p>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT, position: "relative", borderRadius: "26px 26px 0 0", overflow: "hidden" }} data-screen-label="Sticker">
+      <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 2px", flexShrink: 0 }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: "var(--ff-surface-2)" }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px 4px", flexShrink: 0 }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ff-text)", margin: 0 }}>Logro desbloqueado</p>
+        <button onClick={onClose} aria-label="Cerrar" style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-2)" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", borderRadius: 999, padding: "5px 16px", marginBottom: 18 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-red-light)" }}>{s.idx + 1} de {STICKER_STAGES.length}</span>
+        </div>
+        <div style={{ position: "relative", width: "100%", maxWidth: 320, height: 340, flexShrink: 0, borderRadius: 20, background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <StickerMedal s={{ ...s, isNew: false }} size={190} />
+          {list.length > 1 ? arrow(-1) : null}
+          {list.length > 1 ? arrow(1) : null}
+        </div>
+        {list.length > 1 ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+            {list.map((x, k) => <span key={x.key} style={{ width: k === i ? 18 : 6, height: 6, borderRadius: 3, background: k === i ? "var(--ff-red)" : "var(--ff-border)", transition: "width .2s ease" }} />)}
           </div>
-        ) : (
-          generations.map((gen, idx) => (
-            <React.Fragment key={gen.id}>
-              <div
-                onClick={() => setSelected(gen)}
-                style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 16px", cursor: "pointer" }}
-              >
-                <div style={{ width: 56, height: 56, borderRadius: 12, background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <GenStackIcon size={24} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontFamily: "var(--font-body)", fontSize: 16, color: "var(--ff-text)", margin: 0 }}>{gen.name}</p>
-                  <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "2px 0 0" }}>{gen.progress}% completado · {gen.date}</p>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6" /></svg>
-              </div>
-              {idx < generations.length - 1 && <div style={{ height: "0.5px", background: "var(--ff-border)", margin: "0 16px" }} />}
-            </React.Fragment>
-          ))
-        )}
+        ) : null}
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-red)", textAlign: "center", margin: "18px 0 8px", letterSpacing: "-.2px" }}>{s.name}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", textAlign: "center", lineHeight: 1.55, margin: 0, maxWidth: 300 }}>{stickerCopy(s, gen)}</p>
+      </div>
+      <div style={{ padding: "16px 20px 32px", display: "flex", gap: 10, flexShrink: 0 }}>
+        <button onClick={() => setShareOpen(true)} style={{ flex: 1, height: 52, borderRadius: 14, background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 15, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
+          Compartir logro
+        </button>
+        <button aria-label="Descargar" style={{ width: 52, height: 52, borderRadius: 14, background: "var(--ff-surface-2)", border: "0.5px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-2)" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+        </button>
+      </div>
+      {shareOpen ? <div onClick={() => setShareOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 10 }} /> : null}
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: "var(--ff-surface)", borderTop: "0.5px solid var(--ff-border)", borderRadius: "22px 22px 0 0", padding: "14px 20px 36px", transform: shareOpen ? "translateY(0)" : "translateY(100%)", transition: "transform .32s cubic-bezier(.32,.72,0,1)", zIndex: 11 }}>
+        <div style={{ width: 36, height: 4, background: "var(--ff-surface-2)", borderRadius: 2, margin: "0 auto 20px" }} />
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", fontWeight: 600, letterSpacing: "1.5px", textTransform: "uppercase", margin: "0 0 18px" }}>Compartir vía</p>
+        <div style={{ display: "flex", gap: 18 }}>
+          {STK_SHARE_OPTIONS.map((opt) => (
+            <div key={opt.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer", minWidth: 58 }}>
+              <div style={{ width: 54, height: 54, borderRadius: 16, background: opt.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{opt.icon}</div>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-2)" }}>{opt.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
+}
+
+function MyGenerationsFlow({ onBack }) {
+  const [gen, setGen] = React.useState(null);
+  const [sticker, setSticker] = React.useState(null);
+  if (!gen) return <MyGenerationsScreen onBack={onBack} onOpen={setGen} />;
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      <GenerationStickersDetail gen={gen} onBack={() => { setGen(null); setSticker(null); }} onSticker={setSticker} />
+      {sticker ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 30 }}>
+          <div onClick={() => setSticker(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.5)" }} />
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: 14 }}>
+            <StickerSheetScreen gen={gen} startKey={sticker} onClose={() => setSticker(null)} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function GenerationHistoryScreen({ onBack }) {
+  return <MyGenerationsFlow onBack={onBack} />;
 }
 
 window.GenerationHistoryScreen = GenerationHistoryScreen;
+window.MyGenerationsScreen = MyGenerationsScreen;
+window.GenerationStickersDetail = GenerationStickersDetail;
+window.StickerSheetScreen = StickerSheetScreen;
 
 // ── Milestone.jsx ───────────────────────────────────────────────
 // FitFighters mobile — Milestone / Achievement screen.
@@ -4993,6 +5426,19 @@ function Catalog() {
   const wsd = window.FF_DATA.program.weekStartDate;
   const today = { ...(week[todayIdx] ?? week[0]), date: formatShortDate(wsd, todayIdx >= 0 ? todayIdx : 0) };
   const done = doneIdx >= 0 ? { ...week[doneIdx], date: formatShortDate(wsd, doneIdx) } : null;
+  // Muestra de ejercicios por lado (las imágenes son miniaturas existentes).
+  const biImg1 = "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg";
+  const biImg2 = "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg";
+  const biDetail = [{ type: "cycle", name: "Bloque 1", series: 3, restBetweenSeriesSeconds: 60, exercises: [
+    { name: "Sentadilla búlgara", bilateral: "pierna", desc: { kind: "repeats", reps: 10, rir: 2 }, img: biImg1 },
+    { name: "Peso muerto rumano", desc: { kind: "repeats", reps: 12, rir: 1 }, img: biImg2 },
+    { name: "Remo con mancuerna a una mano", bilateral: "brazo", desc: { kind: "repeats", reps: 12, rir: 2 }, rest: "60 seg.", img: biImg2 },
+    { name: "Plancha lateral", bilateral: "lado", desc: { kind: "time", time: "30", unit: "seg" }, img: biImg1 },
+  ] }];
+  const biTrainer = [{ id: "b-bi", type: "cycle", name: "Bloque 1 — Pierna", series: 3, restBetweenSeconds: 20, exercises: [
+    { name: "Sentadilla búlgara", bilateral: "pierna", mode: "reps", reps: 10, img: biImg1, muscles: ["Cuádriceps", "Glúteos"] },
+    { name: "Plancha lateral", bilateral: "lado", mode: "time", timeSeconds: 30, img: biImg2, muscles: ["Oblicuos", "Core"] },
+  ] }, ...(window.FF_DATA.trainerBlocks || []).slice(1)];
 
   const sections = [
     {
@@ -5027,13 +5473,29 @@ function Catalog() {
         { label: "Workout", note: "Hoy es descanso", el: <WorkoutListScreen onSelectDay={noop} todayRest /> },
         { label: "Workout", note: "Selector de semana abierto", el: <WorkoutListScreen onSelectDay={noop} sheetOpen /> },
         { label: "Workout", note: "Viendo otra semana", el: <WorkoutListScreen onSelectDay={noop} initialWeek={4} /> },
-        { label: "Workout", note: "Última semana · fin del plan al final", el: <WorkoutListScreen onSelectDay={noop} lastWeek /> },
-        { label: "Workout", note: "Última semana · sin rutinas por hacer", el: <WorkoutListScreen onSelectDay={noop} lastWeek todayDone planFinished /> },
         { label: "Workout", note: "Sin plan cargado", el: <WorkoutEmptyScreen onStartTutorial={noop} /> },
         { label: "Rutinas anteriores", note: "Completadas y pendientes", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} /> },
         { label: "Rutinas anteriores", note: "Hoy completada · acciones de la fila", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} todayDone demoMenu /> },
         { label: "Rutinas anteriores", note: "Deshacer al desmarcar", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} demoSnack /> },
         { label: "Rutinas anteriores", note: "Pendientes tras desmarcar", el: <PastRoutinesScreen onBack={noop} onSelectDay={noop} initialFilter="pending" demoUndone /> },
+      ],
+    },
+    {
+      title: "Workout · avisos",
+      cells: [
+        { label: "B1 · next_plan_ready", note: "Fila en el home", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_ready" noticeFocus /> },
+        { label: "B1 · next_plan_ready", note: "Hoja abierta", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_ready" noticeOpen /> },
+        { label: "B1 · next_plan_ready", note: "Hoja · cargando plan", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_ready" noticeOpen noticeDemoLoading /> },
+        { label: "B2 · next_plan_reserved", note: "Fila en el home", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_reserved" noticeFocus /> },
+        { label: "B2 · next_plan_reserved", note: "Hoja abierta", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_reserved" noticeOpen /> },
+        { label: "B3 · next_plan_available", note: "Fila en el home", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_available" noticeFocus /> },
+        { label: "B3 · next_plan_available", note: "Hoja abierta", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_available" noticeOpen /> },
+        { label: "B3 · next_plan_available", note: "Hoja · cargando plan", el: <WorkoutListScreen onSelectDay={noop} notice="next_plan_available" noticeOpen noticeDemoLoading /> },
+        { label: "B4 · plan_ending", note: "Fila en el home", el: <WorkoutListScreen onSelectDay={noop} notice="plan_ending" noticeFocus /> },
+        { label: "B4 · plan_ending", note: "Hoja abierta", el: <WorkoutListScreen onSelectDay={noop} notice="plan_ending" noticeOpen /> },
+        { label: "B5 · enrollment", note: "Fila en el home", el: <WorkoutListScreen onSelectDay={noop} notice="enrollment" noticeFocus /> },
+        { label: "B5 · enrollment", note: "Hoja abierta", el: <WorkoutListScreen onSelectDay={noop} notice="enrollment" noticeOpen /> },
+        { label: "Aviso · cargando", note: "Skeleton mientras llega la respuesta", el: <WorkoutListScreen onSelectDay={noop} noticeLoading noticeFocus /> },
       ],
     },
     {
@@ -5049,6 +5511,7 @@ function Catalog() {
         { label: "Detalle de rutina", note: "Hoy", el: <WorkoutDetailScreen item={today} onBack={noop} onStart={noop} /> },
         { label: "Detalle de rutina", note: "Día completado", el: <WorkoutDetailScreen item={done} onBack={noop} onStart={noop} /> },
         { label: "Detalle de rutina", note: "casa · reps 0 y tiempo 0 → Al fallo", el: <WorkoutDetailScreen item={today} blocksOverride={[window.FF_DATA.routineDetailBlocks[1]]} onBack={noop} onStart={noop} /> },
+        { label: "Ejercicios por lado", note: "Un renglón por lado: izquierda y luego derecha", el: <WorkoutDetailScreen item={today} blocksOverride={biDetail} onBack={noop} onStart={noop} /> },
       ],
     },
     {
@@ -5078,6 +5541,11 @@ function Catalog() {
         { label: "Prepárate", note: "modal 3-2-1 al iniciar sección o al reanudar", el: <TrainerImmersiveScreen blockIdx={0} showPreroll /> },
         { label: "Último ejercicio", note: "La card de abajo pasa a 'Finalizar entrenamiento'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} /> },
         { label: "Rutina completa", note: "Al dar siguiente o acabar el tiempo: cola desplegada y 'Finalizar rutina'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} finishOpen /> },
+        { label: "Por lado · izquierda", note: "A continuación avisa el cambio de lado", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={0} /> },
+        { label: "Cambio de lado", note: "3-2-1 al pasar al lado derecho, sin descanso", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={1} showPreroll /> },
+        { label: "Por lado · derecha", note: "El lado izquierdo queda marcado como hecho", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={1} /> },
+        { label: "Por lado · tiempo", note: "Mismo patrón con ejercicios de tiempo", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={2} /> },
+        { label: "Por lado · cola", note: "Los ejercicios por lado indican 'por lado'", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={0} queueOpen /> },
       ],
     },
     {
@@ -5109,11 +5577,14 @@ function Catalog() {
       ],
     },
     {
-      title: "Generaciones",
+      title: "Mis generaciones",
       cells: [
-        { label: "Historial", el: <GenerationHistoryScreen onBack={noop} /> },
-        { label: "Detalle de generación", el: <GenerationHistoryScreen initialSelectedId={1} onBack={noop} /> },
-        { label: "Historial vacío", el: <GenerationHistoryScreen generationsOverride={[]} onBack={noop} /> },
+        { label: "Mis generaciones", note: "Actual, próximas y anteriores", el: <GenerationHistoryScreen onBack={noop} /> },
+        { label: "Detalle · actual", note: "Siguiente sticker y colección", el: <GenerationStickersDetail gen={window.FF_DATA.generations[1]} onBack={noop} onSticker={noop} /> },
+        { label: "Detalle · actual", note: "Aún sin stickers", el: <GenerationStickersDetail gen={{ ...window.FF_DATA.generations[1], progress: 0, stickers: [], newKeys: [] }} onBack={noop} onSticker={noop} /> },
+        { label: "Detalle · anterior", note: "Colección completa", el: <GenerationStickersDetail gen={window.FF_DATA.generations[3]} onBack={noop} onSticker={noop} /> },
+        { label: "Sticker", note: "Recorre los desbloqueados", el: <StickerSheetScreen gen={window.FF_DATA.generations[1]} startKey="thirty_percent_completed" onClose={noop} /> },
+        { label: "Sticker", note: "Compartir", el: <StickerSheetScreen gen={window.FF_DATA.generations[1]} startKey="thirty_percent_completed" initialShareOpen onClose={noop} /> },
       ],
     },
     {
