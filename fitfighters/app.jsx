@@ -2257,7 +2257,7 @@ const APP_LANGUAGES = [
   { code: "en", name: "English", local: "Inglés" },
 ];
 
-function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onLanguage, onFeedback, beta = true, lang = "es", onClose }) {
+function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangeProgram, onGenerations, onLanguage, onTrainingMode, onFeedback, beta = true, lang = "es", onClose }) {
   const [scrolled, onScroll] = useBarScroll();
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Perfil">
@@ -2325,6 +2325,7 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
         <ProfileSectionLabel>Preferencias</ProfileSectionLabel>
         <Card padding="0">
           <MenuRow icon={ProfileIcon(<><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>)} label="Idioma" sublabel={(APP_LANGUAGES.find((l) => l.code === lang) || APP_LANGUAGES[0]).name} onClick={onLanguage} />
+          <MenuRow icon={ProfileIcon(<><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>)} label="Modo de entrenamiento" sublabel="Lista de ejercicios" divider onClick={onTrainingMode} />
         </Card>
 
         {/* Support */}
@@ -3712,6 +3713,9 @@ function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, que
             <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase", color: color, marginTop: 6 }}>
               {hero.kind === "failure" ? "Hasta no poder más" : hero.label}
             </span>
+            {hero.kind === "reps" && block.type !== "rest" && (step.ex || {}).rir != null && (
+              <span style={{ marginTop: 10, fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff", background: "var(--ff-red)", borderRadius: 4, padding: "3px 8px", whiteSpace: "nowrap" }}>{step.ex.rir === 0 ? "Al fallo" : "RIR " + step.ex.rir}</span>
+            )}
             {clockBase && (
               <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.55)", marginTop: 8 }}>{clockBase.l} {fmtCountdown(clockSecs)}</span>
             )}
@@ -5383,6 +5387,848 @@ function App() {
 
 window.App = App;
 
+// ── Modo lista · Solo datos de sección (aprobado desde draft variante D) ──────
+// Aislado en su propio scope; misma lógica que paper.jsx (variante D).
+(function () {
+const { Button, Badge } = window.FitFightersDesignSystem_4614fc;
+const HEX = { cycle: "#FF3200", stripset: "#FF9A3C", fortime: "#2ECF7A", amrap: "#4DA6FF", cardio: "#4DA6FF", emom: "#C77DFF", rest: "#6B7A8D" };
+const fmt = (s) => { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+function targetText(d) {
+  if (!d) return "";
+  if (d.kind === "repeats") return !d.reps ? "Al fallo" : d.reps + " reps" + (d.rir != null ? " · RIR " + d.rir : "");
+  if (d.kind === "time") return d.unit === "seg" ? d.time + " seg" : d.time + " " + (d.unit || "");
+  if (d.kind === "stripset") return d.reps.join(" · ") + " reps" + (d.rir != null ? " · RIR " + d.rir : "");
+  if (d.kind === "emom") return "Empieza en " + d.initial + " reps, +" + d.increment + " cada minuto";
+  return "";
+}
+function buildRoutine() {
+  const src = (window.FF_DATA && window.FF_DATA.routineDetailBlocks) || [];
+  let cyc = 0, single = 0;
+  const blocks = [];
+  src.forEach((b, bi) => {
+    const id = "b" + bi;
+    if (b.type === "rest") { blocks.push({ id, type: "rest", secs: b.timeSeconds }); return; }
+    const exs = b.exercises || [];
+    let name = b.name, n = 0;
+    if (b.type === "cycle") { cyc += 1; name = "Ciclo " + cyc + (b.home ? " · En casa" : ""); n = b.series; }
+    else if (b.type === "stripset") n = b.series;
+    else if (b.type === "fortime") n = b.rounds;
+    else if (b.type === "emom") n = 7;
+    else if (b.type === "cardio") n = 1;
+    const rows = exs.map((e) => ({ ex: e, target: targetText(e.desc) }));
+    if (b.type === "cycle" && exs.length === 1) { single += 1; cyc -= 1; name = "Ejercicio " + single; }
+    blocks.push({ id, type: b.type, name, rows, n, src: b, dkey: id + "-d" });
+  });
+  return blocks;
+}
+function simpleStats(b) {
+  const s = b.src, rest = s.restBetweenSeriesSeconds ? s.restBetweenSeriesSeconds + " s" : "—";
+  const R = { label: "Descanso entre ejercicios", value: rest };
+  if (b.type === "cycle" || b.type === "stripset") return [{ label: "Series", value: s.series }, R];
+  if (b.type === "fortime") return [{ label: "Rondas", value: s.rounds }, R];
+  if (b.type === "emom") return [{ label: "Minutos", value: b.n }, R];
+  return [{ label: "Duración", value: fmt(s.totalTimeSeconds) }, R];
+}
+const ICheck = ({ color = "#0F0F0F", size = 18, w = 3 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+);
+const IInfo = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+);
+function ExName({ row, onOpen, done }) {
+  return (
+    <button onClick={onOpen} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", color: done ? "var(--ff-text-3)" : "var(--ff-text)", minWidth: 0 }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 500, lineHeight: 1.3, textWrap: "pretty" }}>{row.ex.name}</span>
+      <span style={{ color: "var(--ff-text-3)" }}><IInfo /></span>
+    </button>
+  );
+}
+function SectionList({ blocks, isOn, toggle, open }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {blocks.map((b) => {
+        if (b.type === "rest") return (
+          <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px" }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>Descanso</span>
+            <span style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", fontVariantNumeric: "tabular-nums" }}>{fmt(b.secs)}</span>
+          </div>
+        );
+        const color = HEX[b.type], on = isOn(b.dkey);
+        return (
+          <div key={b.id} style={{ background: "var(--ff-surface)", border: `1px solid ${on ? tint(color, 0.45) : "var(--ff-border)"}`, borderRadius: 16, padding: "14px 8px 16px 16px", transition: "border-color .15s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: on ? "var(--ff-text-3)" : "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>{b.name}</p>
+              </div>
+              <button onClick={() => toggle(b.dkey)} role="checkbox" aria-checked={on} aria-label={"Completar " + b.name} style={{ width: 52, height: 52, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                <span style={{ width: 32, height: 32, borderRadius: "50%", boxSizing: "border-box", border: on ? "none" : "2px solid var(--ff-text-3)", background: on ? color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .12s ease" }}>{on ? <ICheck size={18} /> : null}</span>
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8, marginTop: 12, paddingRight: 8 }}>
+              {simpleStats(b).map((st) => (
+                <div key={st.label} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{st.label}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600, color: on ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", marginTop: 14, paddingRight: 8 }}>
+              {b.rows.map((r, ri) => (
+                <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 0", borderTop: "1px solid var(--ff-border)" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}><ExName row={r} onOpen={() => open(b, r)} done={on} /></div>
+                    {r.sides ? null : <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.target}</span>}
+                  </div>
+                  {r.sides ? r.sides.map((sd) => (
+                    <div key={sd} style={{ display: "flex", alignItems: "baseline", gap: 12, paddingLeft: 12, borderLeft: "1px solid var(--ff-border)" }}>
+                      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 13, color: on ? "var(--ff-text-3)" : "var(--ff-text-2)" }}>{sd}</span>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.target}</span>
+                    </div>
+                  )) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+function ListInstructionSheet({ item, onClose }) {
+  const [video, setVideo] = React.useState(false);
+  const lib = (window.FF_DATA.exerciseLibrary || {})[item.row.ex.name] || {};
+  const steps = lib.instructions || (window.FF_DATA.exerciseCues || {})[item.row.ex.name] || [];
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 28px", maxHeight: "82%", overflowY: "auto", boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", padding: "0 0 14px", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: 12, overflow: "hidden", background: "#111" }}>
+          {video && lib.videoUrl ? (
+            <video src={lib.videoUrl} controls autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <button onClick={() => setVideo(true)} style={{ position: "absolute", inset: 0, border: "none", padding: 0, cursor: "pointer", background: "transparent" }}>
+              <img src={item.row.ex.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <span style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,.1))" }} />
+              <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 14px 0 10px", borderRadius: 32, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.28)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 11 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="6 4 20 12 6 20" /></svg>Ver video
+              </span>
+            </button>
+          )}
+        </div>
+        <div style={{ height: 16 }} />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.35, margin: "0 0 4px" }}>{item.row.ex.name}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "0 0 12px" }}>{item.block.name} · {item.row.target}</p>
+        {lib.muscles && lib.muscles.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>{lib.muscles.map((m) => <Badge key={m}>{m}</Badge>)}</div> : null}
+        {steps.length ? (
+          <>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 8px" }}>Instrucciones</p>
+            <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {steps.map((s, i) => (
+                <li key={i} style={{ display: "flex", gap: 10 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text-3)", width: 14, flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text)", lineHeight: 1.45, textWrap: "pretty" }}>{s}</span>
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+function ListModeScreen({ preset = "empty", sheetOpen = false, bilateral = false }) {
+  const blocks = React.useMemo(() => {
+    const bl = buildRoutine();
+    if (bilateral) {
+      const t = bl.find((b) => b.type === "cycle" && b.rows.length > 1) || bl.find((b) => b.type === "cycle");
+      const lib = (window.FF_DATA.exerciseLibrary || {})["Sentadilla búlgara"] || {};
+      if (t) t.rows = [{ ex: { name: "Sentadilla búlgara", img: lib.img, desc: { kind: "repeats", reps: 10 } }, target: "10 reps", sides: ["Pierna derecha", "Pierna izquierda"] }, ...t.rows];
+    }
+    return bl;
+  }, []);
+  const work = blocks.filter((b) => b.type !== "rest");
+  const allKeys = work.map((b) => b.dkey);
+  const [checks, setChecks] = React.useState(() => { const o = {}; if (preset === "all") allKeys.forEach((k) => { o[k] = true; }); return o; });
+  const [sheet, setSheet] = React.useState(() => sheetOpen ? { block: work[0], row: work[0].rows[0] } : null);
+  const [scrolled, setScrolled] = React.useState(false);
+  const isOn = (k) => !!checks[k];
+  const toggle = (k) => setChecks((c) => ({ ...c, [k]: !c[k] }));
+  const open = (block, row) => setSheet({ block, row });
+  const total = allKeys.length, done = allKeys.filter(isOn).length, complete = done === total;
+  // Al completar todos los checks la rutina se marca sola y aparece el cierre.
+  const [doneSheet, setDoneSheet] = React.useState(preset === "all");
+  const wasComplete = React.useRef(complete);
+  React.useEffect(() => { if (complete && !wasComplete.current) setDoneSheet(true); wasComplete.current = complete; }, [complete]);
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Modo lista">
+      <div style={{ flexShrink: 0, height: 56, display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 8, padding: "0 12px", position: "relative" }}>
+        <button aria-label="Salir" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <div style={{ position: "absolute", left: 60, right: 60, top: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: scrolled ? 1 : 0, transform: scrolled ? "none" : "translateY(4px)", transition: "opacity .2s ease, transform .2s ease" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-text)", letterSpacing: "-.2px", margin: 0, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Pecho y tríceps</p>
+        </div>
+      </div>
+      <div onScroll={(e) => { const s = e.currentTarget.scrollTop > 36; if (s !== scrolled) setScrolled(s); }} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 16px 32px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "4px 2px 16px" }}>Pecho y tríceps</p>
+        <SectionList blocks={blocks} isOn={isOn} toggle={toggle} open={open} />
+      </div>
+      {sheet ? <ListInstructionSheet item={sheet} onClose={() => setSheet(null)} /> : null}
+      {doneSheet ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 35, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div onClick={() => setDoneSheet(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+          <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+            <div onClick={() => setDoneSheet(false)} style={{ display: "flex", justifyContent: "center", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center", padding: "8px 0 4px" }}>
+              <span style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(46,207,122,0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}><ICheck color="#2ECF7A" size={26} w={2.8} /></span>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>¡Rutina completada!</p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, maxWidth: 280, textWrap: "pretty" }}>Lo hiciste genial. Cada rutina te acerca a tu objetivo. ¡Sigue así!</p>
+            </div>
+            <Button>Salir</Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+const { SectionBadge } = window.FitFightersDesignSystem_4614fc;
+const LIGHT = {
+  "--ff-bg": "#F7F7F7", "--ff-surface": "#FFFFFF", "--ff-surface-2": "#F1F1F1", "--ff-border": "#E2E2E2",
+  "--ff-text": "#141414", "--ff-text-2": "#5C5C5C", "--ff-text-3": "#8E8E8E", "--ff-red-light": "#CC2800",
+  "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+const MODES = [
+  { key: "trainer", name: "Entrenador virtual", desc: "Video de cada ejercicio, cronómetros y avance automático." },
+  { key: "list", name: "Lista de ejercicios", desc: "Toda la rutina en una lista. Marcas cada serie a tu ritmo." },
+];
+const Radio = ({ on }) => <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box", border: on ? "6px solid var(--ff-red)" : "2px solid var(--ff-text-3)", transition: "border .15s ease" }} />;
+function ModePreferenceScreen() {
+  const [mode, setMode] = React.useState("list");
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...LIGHT }} data-screen-label="Modo de entrenamiento">
+      <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }}>
+        <button aria-label="Volver" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 2px 6px" }}>Modo de entrenamiento</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: "0 2px 20px", textWrap: "pretty" }}>Elige cómo ver tu rutina al entrenar. Tu programa y tu progreso no cambian.</p>
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+          {MODES.map((m, i) => {
+            const sel = m.key === mode;
+            return (
+              <button key={m.key} onClick={() => setMode(m.key)} role="radio" aria-checked={sel} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 72, padding: "14px 16px", background: "transparent", border: "none", borderTop: i ? "1px solid var(--ff-border)" : "none", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: sel ? 600 : 400, color: "var(--ff-text)", margin: 0 }}>{m.name}</p>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>{m.desc}</p>
+                </div>
+                <Radio on={sel} />
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.5, margin: "12px 2px 0" }}>Se aplica desde tu próxima rutina.</p>
+      </div>
+    </div>
+  );
+}
+function FirstTimeModeSheet() {
+  const [mode, setMode] = React.useState("list");
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...LIGHT }} data-screen-label="Elegir modo · primera vez">
+      <div style={{ padding: "72px 18px 0" }}>
+        <SectionBadge type="cycle" label="Martes" />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 0 0" }}>Pecho y tríceps</p>
+      </div>
+      <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+        <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "center" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+          <div>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>¿Cómo quieres entrenar?</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras en Perfil › Preferencias.</p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {MODES.map((m) => {
+              const sel = m.key === mode;
+              return (
+                <button key={m.key} onClick={() => setMode(m.key)} role="radio" aria-checked={sel} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 12, border: `1px solid ${sel ? "var(--ff-red)" : "var(--ff-border)"}`, background: sel ? "var(--ff-primary-container)" : "transparent", cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>{m.name}</p>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>{m.desc}</p>
+                  </div>
+                  <Radio on={sel} />
+                </button>
+              );
+            })}
+          </div>
+          <Button>Comenzar rutina</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+window.FFModePreferenceScreen = ModePreferenceScreen;
+window.FFFirstTimeModeSheet = FirstTimeModeSheet;
+window.FFListModeScreen = ListModeScreen;
+})();
+const ListModeScreen = (p) => React.createElement(window.FFListModeScreen, p);
+const ModePreferenceScreen = (p) => React.createElement(window.FFModePreferenceScreen, p);
+const FirstTimeModeSheet = (p) => React.createElement(window.FFFirstTimeModeSheet, p);
+
+// ── Rutinas sin conexión (aprobado desde draft offline.jsx · hero 1b) ──────
+// Aislado en su propio scope; misma lógica que offline.jsx.
+(function () {
+const { Button, Card, MenuRow, Badge } = window.FitFightersDesignSystem_4614fc;
+const APP_LIGHT = {
+  "--ff-surface": "#FFFFFF", "--ff-surface-2": "#F1F1F1", "--ff-border": "#E2E2E2",
+  "--ff-text": "#141414", "--ff-text-2": "#5C5C5C", "--ff-text-3": "#8E8E8E",
+  "--ff-red-light": "#CC2800", "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+const APP_LIGHT_BG = { "--ff-bg": "rgba(255,255,255,0.90)" };
+const WORKOUT_HERO = "https://d3gfgejixr95u4.cloudfront.net/app/production/routines/1691718103462.jpg";
+// Tintas legibles sobre blanco (mismas que NOTICE_TONES del aprobado).
+const INK = { green: "#12804A", orange: "#B35600", red: "#D62A00" };
+const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function formatShortDate(iso, dayOffset) {
+  const dt = new Date(iso + "T00:00:00");
+  dt.setDate(dt.getDate() + dayOffset);
+  return `${dt.getDate()} ${MONTHS_ES[dt.getMonth()]}`;
+}
+function estimateRoutineMinutes(blocks) {
+  const seconds = blocks.reduce((total, b) => {
+    const n = (b.exercises || []).length;
+    if (b.type === "rest") return total + (b.timeSeconds || 0);
+    if (b.type === "amrap" || b.type === "cardio") return total + (b.totalTimeSeconds || 0);
+    if (b.type === "emom") return total + (b.minutesTotal || 0) * 60;
+    if (b.type === "fortime") return total + (b.rounds || 1) * n * 40;
+    return total + (b.series || 1) * (n * 45 + (b.restBetweenSeriesSeconds || 0));
+  }, 0);
+  return Math.max(5, Math.round(seconds / 60 / 5) * 5);
+}
+
+// ── Piezas aprobadas (copia) ───────────────────────────────────
+function DualProgressBar({ user, plan }) {
+  return (
+    <div style={{ position: "relative", height: 6, borderRadius: 3, background: "var(--ff-surface-2)", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: plan + "%", background: "rgba(255,50,0,0.28)", borderRadius: 3 }} />
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: user + "%", background: "var(--ff-red)", borderRadius: 3 }} />
+    </div>
+  );
+}
+function ProgramHeaderFlat({ prog }) {
+  const p = prog;
+  return (
+    <div style={{ padding: "0 18px 16px" }}>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>{p.generation}</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 21, color: "var(--ff-text)", lineHeight: 1.2, letterSpacing: "-.4px", margin: 0 }}>{p.name}</h1>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-red-light)", background: "var(--ff-primary-container)", border: "1px solid rgba(255,50,0,.25)", padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap", flexShrink: 0 }}>Nivel {p.level}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "16px 0 8px" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)" }}>Semana {p.week} de {p.totalWeeks}</span>
+      </div>
+      <DualProgressBar user={p.userProgress} plan={p.planProgress} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--ff-red)", flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: "var(--ff-text)" }}>Tu progreso {p.userProgress}%</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "rgba(255,50,0,0.28)", flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)" }}>Avance del plan {p.planProgress}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+function MaskIcon({ name, size = 20, color = "#fff" }) {
+  const url = `assets/icons/${name}.svg`;
+  return <span style={{ width: size, height: size, display: "block", background: color, WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center", maskPosition: "center" }} />;
+}
+function InitialsAvatar() {
+  return <button aria-label="Perfil" style={{ width: 40, height: 40, borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>EN</button>;
+}
+function TwoTabBar() {
+  const tabs = [{ id: "workout", label: "Workout", icon: "ic_workout" }, { id: "chat", label: "Chat", icon: "ic_chat" }];
+  return (
+    <nav style={{ display: "flex", flexShrink: 0, paddingTop: 28, paddingBottom: 8, marginTop: -28, position: "relative", zIndex: 2, background: "linear-gradient(to top, #FFFFFF 0%, #FFFFFF 62%, rgba(255,255,255,0) 100%)" }}>
+      {tabs.map((t) => {
+        const sel = t.id === "workout";
+        return (
+          <button key={t.id} style={{ flex: 1, height: 64, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, background: "none", border: "none", cursor: "pointer" }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 28, padding: "0 20px", borderRadius: 999, background: sel ? "var(--ff-red)" : "transparent" }}>
+              <MaskIcon name={t.icon + (sel ? "_filled" : "_outlined")} size={20} color={sel ? "#fff" : "var(--ff-text-3)"} />
+            </span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: sel ? 700 : 500, color: sel ? "var(--ff-red)" : "var(--ff-text-3)" }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+function PendingRow() {
+  return (
+    <button style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 12, cursor: "pointer", textAlign: "left" }}>
+      <span style={{ width: 34, height: 34, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-primary-container)" }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red-light)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)" }}>Rutinas anteriores</span>
+        <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>Completadas y pendientes de tu plan</span>
+      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+    </button>
+  );
+}
+function WeekPill({ week }) {
+  return (
+    <button style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+      Semana {week}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+    </button>
+  );
+}
+function CircleIconBtn({ kind = "back", onClick, plain }) {
+  return (
+    <button onClick={onClick} aria-label={kind === "close" ? "Cerrar" : "Atrás"} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: plain ? "transparent" : "rgba(20,20,20,0.06)", transition: "background .2s ease" }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {kind === "close" ? <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g> : <path d="M19 12H5M12 5l-7 7 7 7" />}
+      </svg>
+    </button>
+  );
+}
+function FloatingTopBar({ title, onBack, onClose, scrolled }) {
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", background: scrolled ? "var(--ff-bg)" : "transparent", borderBottom: scrolled ? "1px solid var(--ff-border)" : "1px solid transparent", transition: "background .2s ease, border-color .2s ease" }}>
+      {onBack ? <CircleIconBtn kind="back" onClick={onBack} plain={scrolled} /> : <span style={{ width: 40, flexShrink: 0 }} />}
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.2px", opacity: scrolled ? 1 : 0, transition: "opacity .2s ease", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+      {onClose ? <CircleIconBtn kind="close" onClick={onClose} plain={scrolled} /> : <span style={{ width: 40, flexShrink: 0 }} />}
+    </div>
+  );
+}
+function useBarScroll() {
+  const [scrolled, setScrolled] = React.useState(false);
+  const onScroll = (e) => { const s = e.currentTarget.scrollTop > 6; setScrolled((p) => (p === s ? p : s)); };
+  return [scrolled, onScroll];
+}
+const ProfileIcon = (children) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
+const ProfileSectionLabel = ({ children }) => <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "20px 2px 8px" }}>{children}</p>;
+
+// ── Descarga: íconos, anillo y estado ──────────────────────────
+const GLYPH = {
+  none: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
+  done: <><polyline points="20 5 9 16 4 11" /><line x1="4" y1="21" x2="20" y2="21" /></>,
+  pending: <><polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" /></>,
+  queued: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+  failed: <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>,
+  trash: <><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>,
+  wifiOff: <><line x1="1" y1="1" x2="23" y2="23" /><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" /><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" /><path d="M10.71 5.05A16 16 0 0 1 22.58 9" /><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><line x1="12" y1="20" x2="12.01" y2="20" /></>,
+};
+const Glyph = ({ name, size = 20, color = "currentColor", sw = 2 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{GLYPH[name]}</svg>;
+function Ring({ pct, size = 24, color, track, sw = 2.5 }) {
+  const r = (size - sw) / 2, c = 2 * Math.PI * r;
+  return (
+    <span style={{ position: "relative", width: size, height: size, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={sw} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw} strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" style={{ transition: "stroke-dashoffset .2s linear" }} />
+      </svg>
+      <span style={{ width: size * 0.3, height: size * 0.3, borderRadius: 1.5, background: color }} />
+    </span>
+  );
+}
+// none → loading → done. Sin conexión: none → queued, y al volver la red arranca sola. Tocar mientras descarga o espera = cancelar. freeze: estado fijo para el catálogo.
+function useDl(init = "none", initPct = 0, freeze, offline) {
+  const [s, setS] = React.useState(init);
+  const [pct, setPct] = React.useState(initPct);
+  React.useEffect(() => {
+    if (s !== "loading" || freeze) return;
+    const t = setInterval(() => setPct((p) => Math.min(100, p + 5)), 140);
+    return () => clearInterval(t);
+  }, [s, freeze]);
+  React.useEffect(() => { if (s === "loading" && pct >= 100) setS("done"); }, [pct, s]);
+  React.useEffect(() => { if (s === "queued" && !offline && !freeze) { setPct(0); setS("loading"); } }, [offline, s, freeze]);
+  const start = () => { setPct(0); setS(offline ? "queued" : "loading"); };
+  const cancel = () => { setS("none"); setPct(0); };
+  return { s, pct, start, cancel, reset: cancel };
+}
+const DL_LABEL = { none: "Descargar rutina", loading: "Cancelar descarga", queued: "Cancelar descarga en espera", done: "Rutina descargada" };
+
+// Botón de la card de la lista: ocupa el lugar del chevron.
+function CardDlButton({ dl, disabled, onManage, onOffline }) {
+  const onClick = (e) => { e.stopPropagation(); dl.s === "none" ? dl.start() : dl.s === "done" ? onManage() : dl.cancel(); };
+  return (
+    <button onClick={onClick} aria-label={DL_LABEL[dl.s]} style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 999, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+      {dl.s === "loading" ? <Ring pct={dl.pct} size={24} color="var(--ff-red)" track="var(--ff-surface-2)" /> : <Glyph name={dl.s} color={dl.s === "done" ? INK.green : "var(--ff-text-2)"} />}
+    </button>
+  );
+}
+// El plan está en caché: la card se ve igual sin conexión; abrir el detalle sin descarga muestra la hoja.
+function RoutineCardDl({ item, mins, blocks, init, pct, freeze, offline, onManage, onOffline }) {
+  const p = window.FF_DATA.program;
+  const dl = useDl(init, pct, freeze, offline);
+  const locked = offline && dl.s !== "done";
+  const meta = dl.s === "loading" ? <span style={{ color: "var(--ff-red-light)", fontWeight: 600 }}>Descargando · {dl.pct}%</span>
+    : dl.s === "queued" ? <span style={{ color: "var(--ff-text)", fontWeight: 600 }}>Se descargará con conexión</span> : `${mins} min · ${blocks} bloques`;
+  return (
+    <div onClick={locked ? onOffline : undefined} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 4px 10px 10px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14, cursor: "pointer" }}>
+      <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ width: 66, height: 66, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 4px" }}>{item.day} · {item.date}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.routine}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0, fontVariantNumeric: "tabular-nums" }}>{meta}</p>
+      </div>
+      <CardDlButton dl={dl} disabled={locked} onManage={() => onManage(item, dl)} onOffline={onOffline} />
+    </div>
+  );
+}
+
+// ── Hero de hoy: tres maneras de ofrecer la descarga ───────────
+function HeroDlControl({ variant, dl, onManage }) {
+  const act = () => (dl.s === "none" ? dl.start() : dl.s === "done" ? onManage() : dl.cancel());
+  const glyph = (size) => dl.s === "loading" ? <Ring pct={dl.pct} size={size + 2} color="#fff" track="rgba(255,255,255,0.25)" /> : <Glyph name={dl.s} size={size} color={dl.s === "done" ? "#2ECF7A" : "#fff"} />;
+  if (variant === "A") return (
+    <button onClick={act} aria-label={DL_LABEL[dl.s]} style={{ position: "absolute", top: 8, right: 8, zIndex: 2, width: 44, height: 44, border: "none", padding: 0, background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center" }}>{glyph(19)}</span>
+    </button>
+  );
+  if (variant === "B") return (
+    <button onClick={act} aria-label={DL_LABEL[dl.s]} style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 10, border: `1px ${dl.s === "queued" ? "dashed" : "solid"} ${dl.s === "done" ? "rgba(46,207,122,0.45)" : "rgba(255,255,255,0.35)"}`, background: dl.s === "done" ? "rgba(46,207,122,0.14)" : "rgba(255,255,255,0.08)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>{glyph(20)}</button>
+  );
+  const done = dl.s === "done";
+  return (
+    <button onClick={act} aria-label={DL_LABEL[dl.s]} style={{ height: 44, padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", flexShrink: 0 }}>
+      <span style={{ height: 30, padding: "0 12px 0 9px", borderRadius: 999, display: "flex", alignItems: "center", gap: 7, border: `1px solid ${done ? "rgba(46,207,122,0.40)" : "rgba(255,255,255,0.35)"}`, background: done ? "rgba(46,207,122,0.16)" : "rgba(255,255,255,0.10)", color: done ? "#2ECF7A" : "#fff", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {dl.s === "loading" ? <Ring pct={dl.pct} size={15} sw={2} color="#fff" track="rgba(255,255,255,0.25)" /> : <Glyph name={dl.s} size={14} sw={2.4} color="currentColor" />}
+        {dl.s === "loading" ? `Descargando ${dl.pct}%` : done ? "Sin conexión lista" : "Descargar"}
+      </span>
+    </button>
+  );
+}
+function TodayHeroDl({ variant, dl, first, mins, blockCount, onManage, onOpen }) {
+  const p = window.FF_DATA.program;
+  const metaTxt = { fontFamily: "var(--font-body)", fontSize: 12.5, color: "rgba(255,255,255,0.80)" };
+  return (
+    <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <img src={p.routineImg || WORKOUT_HERO} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 100%)" }} />
+      {variant === "A" ? <HeroDlControl variant="A" dl={dl} onManage={onManage} /> : null}
+      <div style={{ position: "relative", padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>Hoy · {first.day} {first.date}</p>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", letterSpacing: "-.3px", lineHeight: 1.2, margin: "0 0 8px" }}>{first.routine}</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minHeight: variant === "C" ? 30 : 0, margin: variant === "C" ? "-7px 0" : 0 }}>
+            <span style={metaTxt}>{mins} min aprox.</span>
+            <span style={metaTxt}>{blockCount} bloques</span>
+            {dl.s === "queued" ? <span style={{ ...metaTxt, color: "#fff", fontWeight: 600 }}>Se descargará con conexión</span> : null}
+            {variant === "C" ? <span style={{ flex: 1 }} /> : null}
+            {variant === "C" ? <HeroDlControl variant="C" dl={dl} onManage={onManage} /> : null}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onOpen} style={{ flex: 1, height: 48, borderRadius: 10, border: "none", background: "#FFFFFF", color: "#101010", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer" }}>Ver rutina</button>
+          {variant === "B" ? <HeroDlControl variant="B" dl={dl} onManage={onManage} /> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Hero de hoy completado: Completada / Pendiente de sincronizar (sin red) / Error al sincronizar.
+const SYNC_PILL = {
+  synced: { c: "#2ECF7A", label: "Completada", icon: <polyline points="20 6 9 17 4 12" /> },
+  pending: { c: "#FF9A3C", label: "Pendiente de sincronizar", icon: GLYPH.pending },
+  failed: { c: "#FF5C5C", label: "Sin sincronizar", icon: GLYPH.failed },
+  syncing: { c: "#FFFFFF", label: "Sincronizando…", icon: null },
+};
+function DoneHeroDl({ sync, routine, todayLabel, onRetry }) {
+  const pill = SYNC_PILL[sync];
+  const body = sync === "pending" ? "Tu rutina está guardada en el teléfono. La enviaremos sola en cuanto tengas conexión."
+    : sync === "failed" || sync === "syncing" ? "No pudimos guardarla en tu cuenta, pero está a salvo en el teléfono. Inténtalo de nuevo."
+    : `${routine} queda guardada en tus rutinas anteriores. Hidrátate, come bien y descansa.`;
+  return (
+    <div style={{ position: "relative", minHeight: 230, borderRadius: 16, overflow: "hidden", background: "#0F0F0F", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <img src="assets/entrenamiento_completado.png" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.90) 100%)" }} />
+      <div style={{ position: "relative", padding: "20px 18px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 24, padding: "0 10px", borderRadius: 999, background: `color-mix(in srgb, ${pill.c} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${pill.c} 35%, transparent)`, marginBottom: 10 }}>
+            {sync === "syncing" ? <span style={{ width: 11, height: 11, borderRadius: 999, border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#fff", animation: "ffDlSpin .8s linear infinite" }} /> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={pill.c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">{pill.icon}</svg>}
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10.5, fontWeight: 700, color: pill.c, textTransform: "uppercase", letterSpacing: ".12em" }}>{pill.label}</span>
+          </span>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 6px" }}>{todayLabel}</p>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", letterSpacing: "-.3px", lineHeight: 1.2, margin: "0 0 8px" }}>Terminaste tu entrenamiento de hoy</h2>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.80)", lineHeight: 1.6, margin: 0, maxWidth: 290, textWrap: "pretty" }}>{body}</p>
+        </div>
+        {sync === "failed" || sync === "syncing" ? <button onClick={onRetry} disabled={sync === "syncing"} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "#FFFFFF", color: "#101010", fontFamily: "var(--font-display)", fontSize: 14, letterSpacing: "-.2px", cursor: "pointer", opacity: sync === "syncing" ? 0.7 : 1 }}>Reintentar</button> : null}
+      </div>
+    </div>
+  );
+}
+
+function Snack({ text, action, onAction }) {
+  return (
+    <div style={{ position: "absolute", left: 16, right: 16, bottom: 88, zIndex: 20, display: "flex", alignItems: "center", gap: 12, padding: "13px 8px 13px 16px", background: "var(--ff-surface-2)", border: "1px solid var(--ff-border)", borderRadius: 12, boxShadow: "0 12px 28px rgba(0,0,0,0.5)" }}>
+      <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.4, margin: 0, textWrap: "pretty" }}>{text}</p>
+      {action ? <button type="button" onClick={onAction} style={{ flexShrink: 0, height: 36, padding: "0 12px", borderRadius: 999, border: "none", background: "none", color: "var(--ff-red-light)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{action}</button> : null}
+    </div>
+  );
+}
+
+// Hoja al tocar una rutina ya descargada.
+function ManageSheet({ item, size, onDelete, onClose }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 0 22px" }}>
+        <div style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)", margin: "0 auto 14px" }} />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 20px 4px" }}>{item.routine}</p>
+        <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-body)", fontSize: 12.5, color: INK.green, fontWeight: 600, margin: "0 20px 12px" }}><Glyph name="done" size={14} sw={2.4} color={INK.green} />Disponible sin conexión · {size} MB</p>
+        <button type="button" onClick={onDelete} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "15px 20px", background: "none", border: "none", borderTop: "1px solid var(--ff-border)", cursor: "pointer", textAlign: "left" }}>
+          <Glyph name="trash" size={18} color={INK.red} sw={2.2} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: INK.red }}>Eliminar descarga</span>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", marginTop: 2 }}>La puedes volver a descargar cuando quieras</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Hoja al abrir sin conexión una rutina que no está descargada.
+function OfflineSheet({ onClose }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)", margin: "0 auto" }} />
+        <span style={{ width: 48, height: 48, borderRadius: 13, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-surface-2)" }}><Glyph name="wifiOff" size={22} color="var(--ff-text)" /></span>
+        <div>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.3, margin: "0 0 8px" }}>No tienes conexión</h2>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--ff-text-2)", lineHeight: 1.6, margin: 0, textWrap: "pretty" }}>Esta rutina no está descargada, así que no podemos abrirla ahora. La próxima vez que vayas a entrenar sin conexión, descárgala antes con el ícono de descarga.</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 12, background: "var(--ff-surface-2)" }}>
+          <Glyph name="none" size={18} color="var(--ff-text)" />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.45 }}>Las rutinas descargadas se pueden entrenar sin conexión.</span>
+        </div>
+        <Button onClick={onClose}>Entendido</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Workout W5 con descargas ───────────────────────────────────
+function HomeDl({ hero = "B", heroInit = "none", heroPct = 0, freeze, cards = [], cardPct = 64, done, offline, snack, scroll = 0, sheet, offlineSheet }) {
+  const base = window.FF_DATA.program, p = base;
+  const blockCount = (window.FF_DATA.routineDetailBlocks || []).filter((b) => b.type !== "rest").length;
+  const mins = estimateRoutineMinutes(window.FF_DATA.routineDetailBlocks || []);
+  const template = window.FF_DATA.weekTemplate || [];
+  const todayIdx = Math.max(0, template.findIndex((x) => x.status === "today"));
+  const upcoming = [];
+  for (let offset = done ? 1 : 0; upcoming.length < 6 && offset < 21; offset++) {
+    const i = todayIdx + offset, item = template[i % template.length];
+    if (item.type === "rest") continue;
+    upcoming.push({ ...item, date: formatShortDate(p.weekStartDate, i) });
+  }
+  const first = upcoming[0];
+  const rest = done ? upcoming : upcoming.slice(1);
+  const todayLabel = `Hoy · ${(template[todayIdx] || {}).day} ${formatShortDate(p.weekStartDate, todayIdx)}`;
+  const heroDl = useDl(heroInit, heroPct, freeze, offline);
+  const [manage, setManage] = React.useState(null);
+  const [sync, setSync] = React.useState(done);
+  const [offSheet, setOffSheet] = React.useState(!!offlineSheet);
+  const openOffline = () => setOffSheet(true);
+  const [snk, setSnk] = React.useState(snack ? "offer" : null);
+  const scrollRef = React.useRef(null);
+  React.useEffect(() => { if (scrollRef.current && scroll) scrollRef.current.scrollTop = scroll; }, []);
+  React.useEffect(() => { if (sheet && first) setManage({ item: first, dl: heroDl }); }, []);
+  const retry = () => { setSync("syncing"); setTimeout(() => { setSync("synced"); setSnk("offer"); }, 1400); };
+  const size = 86;
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Workout W5 · descargas">
+      <style>{"@keyframes ffDlSpin{to{transform:rotate(360deg)}}"}</style>
+      <header style={{ display: "flex", alignItems: "center", height: 56, padding: "0 16px", flexShrink: 0 }}>
+        <InitialsAvatar />
+      </header>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 20px" }}>
+        {offline ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 12, background: "var(--ff-surface-2)", marginBottom: 12 }}>
+            <Glyph name="wifiOff" size={18} color="var(--ff-text)" />
+            <p style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text)", lineHeight: 1.45, margin: 0 }}>Sin conexión. Puedes entrenar las rutinas que descargaste.</p>
+          </div>
+        ) : null}
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "16px 0 18px", marginBottom: 12 }}>
+          <ProgramHeaderFlat prog={p} />
+        </div>
+        <div style={{ marginBottom: 18 }}><PendingRow /></div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 2px 10px" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0 }}>Hoy</p>
+          <WeekPill week={p.week} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {sync ? <DoneHeroDl sync={sync} routine={(template[todayIdx] || {}).routine} todayLabel={todayLabel} onRetry={retry} />
+            : <TodayHeroDl variant={hero} dl={heroDl} first={first} mins={mins} blockCount={blockCount} onManage={() => setManage({ item: first, dl: heroDl })} onOpen={offline && heroDl.s !== "done" ? openOffline : undefined} />}
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "8px 2px 0" }}>Tus próximas rutinas</p>
+          {rest.map((item, i) => <RoutineCardDl key={i} item={item} mins={mins} blocks={blockCount} init={cards[i] || "none"} pct={cardPct} freeze={freeze} offline={offline} onManage={(it, dl) => setManage({ item: it, dl })} onOffline={openOffline} />)}
+        </div>
+      </div>
+      <TwoTabBar />
+      {snk === "offer" ? <Snack text={`Rutina sincronizada. ¿Eliminar la descarga y liberar ${size} MB?`} action="Eliminar" onAction={() => setSnk("deleted")} /> : null}
+      {snk === "deleted" ? <Snack text="Eliminaste la descarga." action="Deshacer" onAction={() => setSnk(null)} /> : null}
+      {offSheet ? <OfflineSheet onClose={() => setOffSheet(false)} /> : null}
+      {manage ? <ManageSheet item={manage.item} size={size} onClose={() => setManage(null)} onDelete={() => { manage.dl.reset(); setManage(null); }} /> : null}
+    </div>
+  );
+}
+
+// ── Perfil con Mis descargas ───────────────────────────────────
+function ProfileDl() {
+  const [scrolled, onScroll] = useBarScroll();
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Perfil · Mis descargas">
+      <FloatingTopBar title="Perfil" onClose={() => {}} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, overflowY: "auto", padding: "64px 16px 90px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0 20px" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--ff-surface-2)", border: "2px solid var(--ff-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ff-text-2)", flexShrink: 0 }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", margin: 0 }}>Eduardo García</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: "3px 0 10px" }}>eduardo@gmail.com</p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><Badge>Novatos gym</Badge><Badge>Nivel 3</Badge><Badge tone="active" dot>Activo</Badge></div>
+          </div>
+        </div>
+        <ProfileSectionLabel>Suscripción</ProfileSectionLabel>
+        <Card style={{ borderColor: "rgba(46,207,122,0.3)", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "28px 20px" }}>
+          <Badge tone="active" dot>Activo</Badge>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: 0, lineHeight: 1.4 }}>Gestiona tu plan en <span style={{ color: "var(--ff-red-light)" }}>fitfighters.com</span></p>
+        </Card>
+        <Card padding="0" style={{ marginTop: 12 }}>
+          <MenuRow icon={ProfileIcon(<><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></>)} label="Mis generaciones" />
+          <MenuRow icon={ProfileIcon(GLYPH.none)} label="Mis descargas" sublabel="5 rutinas · 412 MB" divider />
+        </Card>
+        <ProfileSectionLabel>Cuenta</ProfileSectionLabel>
+        <Card padding="0">
+          <MenuRow icon={ProfileIcon(<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>)} label="Editar perfil" />
+          <MenuRow icon={ProfileIcon(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>)} label="Modificar o cambiar plan" divider />
+          <MenuRow icon={ProfileIcon(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)} label="Cambiar contraseña" sublabel="Solo cuentas con correo" divider />
+        </Card>
+        <ProfileSectionLabel>Preferencias</ProfileSectionLabel>
+        <Card padding="0">
+          <MenuRow icon={ProfileIcon(<><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>)} label="Idioma" sublabel="Español" />
+          <MenuRow icon={ProfileIcon(<><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>)} label="Modo de entrenamiento" sublabel="Lista de ejercicios" divider />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ── Mis descargas ──────────────────────────────────────────────
+function buildDownloads() {
+  const p = window.FF_DATA.program;
+  const t = (window.FF_DATA.weekTemplate || []);
+  const todayIdx = Math.max(0, t.findIndex((x) => x.status === "today"));
+  const work = t.filter((x) => x.type !== "rest");
+  const mk = (key, status, off, size, wi) => { const it = work[wi % work.length]; return { key, status, size, day: it.day, routine: it.routine, date: formatShortDate(p.weekStartDate, todayIdx + off) }; };
+  return [
+    mk("p1", "pending", -1, 92, 0),
+    mk("s1", "synced", -3, 86, 1),
+    mk("s2", "synced", -5, 74, 2),
+    mk("u1", "upcoming", 0, 88, 3),
+    mk("u2", "upcoming", 2, 72, 4),
+  ];
+}
+function DownloadsScreen({ empty }) {
+  const [items, setItems] = React.useState(() => (empty ? [] : buildDownloads()));
+  const [snack, setSnack] = React.useState(null);
+  const [retrying, setRetrying] = React.useState(false);
+  const [scrolled, onScroll] = useBarScroll();
+  const img = window.FF_DATA.program.routineImg || WORKOUT_HERO;
+  const total = items.reduce((s, x) => s + x.size, 0);
+  const remove = (keys) => {
+    const gone = items.filter((x) => keys.includes(x.key));
+    setItems((l) => l.filter((x) => !keys.includes(x.key)));
+    setSnack({ gone, text: gone.length > 1 ? `Eliminaste ${gone.length} descargas.` : `Eliminaste la descarga de ${gone[0].routine}.` });
+  };
+  const undo = () => { setItems((l) => buildDownloads().filter((x) => l.some((y) => y.key === x.key) || snack.gone.some((g) => g.key === x.key))); setSnack(null); };
+  const retry = () => { setRetrying(true); setTimeout(() => { setRetrying(false); setItems((l) => l.map((x) => (x.status === "pending" ? { ...x, status: "synced" } : x))); }, 1400); };
+  const groups = [
+    { id: "pending", title: "Por sincronizar", note: "Podrás eliminarla cuando se guarde en tu cuenta." },
+    { id: "synced", title: "Completadas", bulk: true },
+    { id: "upcoming", title: "Por hacer" },
+  ];
+  const statusLine = (x) => x.status === "pending" ? <span style={{ color: INK.orange, fontWeight: 600 }}>Pendiente de sincronizar</span>
+    : x.status === "synced" ? <span><span style={{ color: INK.green, fontWeight: 600 }}>Sincronizada</span> · {x.size} MB</span> : `${x.size} MB`;
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Mis descargas">
+      <style>{"@keyframes ffDlSpin{to{transform:rotate(360deg)}}"}</style>
+      <FloatingTopBar title="Mis descargas" onBack={() => {}} scrolled={scrolled} />
+      <div onScroll={onScroll} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "64px 16px 32px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 21, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 2px 6px" }}>Mis descargas</h1>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 2px 4px", textWrap: "pretty" }}>Las rutinas descargadas se pueden entrenar sin conexión.</p>
+        {items.length ? <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "0 2px", fontVariantNumeric: "tabular-nums" }}>{items.length} {items.length === 1 ? "rutina" : "rutinas"} · {total} MB en este teléfono</p> : null}
+        {!items.length ? (
+          <div style={{ marginTop: 28, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: "30px 20px", textAlign: "center" }}>
+            <span style={{ width: 56, height: 56, borderRadius: 16, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ff-surface-2)" }}><Glyph name="none" size={24} color="var(--ff-text-2)" /></span>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", margin: "0 0 6px" }}>Sin descargas</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.6, margin: "0 auto", maxWidth: 250 }}>Toca el ícono de descarga en una rutina de Workout para entrenarla sin conexión.</p>
+          </div>
+        ) : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 20 }}>
+          {groups.map((g) => {
+            const list = items.filter((x) => x.status === g.id);
+            if (!list.length) return null;
+            return (
+              <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 32, margin: "0 2px" }}>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: 0 }}>{g.title}</p>
+                  {g.bulk && list.length > 1 ? <button onClick={() => remove(list.map((x) => x.key))} style={{ height: 32, padding: "0 4px", border: "none", background: "none", color: "var(--ff-red-light)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Eliminar todas</button> : null}
+                </div>
+                {list.map((x) => (
+                  <div key={x.key} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 4px 10px 10px", background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 14 }}>
+                    <img src={img} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", flexShrink: 0, filter: x.status === "upcoming" ? "none" : "saturate(0.75)" }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, color: "var(--ff-text-3)", textTransform: "uppercase", letterSpacing: ".12em", margin: "0 0 3px" }}>{x.day} · {x.date}</p>
+                      <p style={{ fontFamily: "var(--font-body)", fontSize: 14.5, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.routine}</p>
+                      <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", margin: 0, fontVariantNumeric: "tabular-nums" }}>{statusLine(x)}</p>
+                    </div>
+                    {x.status === "pending" ? (
+                      <button onClick={retry} disabled={retrying} style={{ flexShrink: 0, height: 36, margin: "0 6px 0 0", padding: "0 14px", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", color: "var(--ff-text)", fontFamily: "var(--font-body)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                        {retrying ? <span style={{ width: 12, height: 12, borderRadius: 999, border: "2px solid var(--ff-border)", borderTopColor: "var(--ff-text)", animation: "ffDlSpin .8s linear infinite" }} /> : null}
+                        {retrying ? "Sincronizando" : "Reintentar"}
+                      </button>
+                    ) : (
+                      <button onClick={() => remove([x.key])} aria-label={"Eliminar descarga de " + x.routine} style={{ width: 44, height: 44, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                        <Glyph name="trash" size={19} color="var(--ff-text-2)" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {g.note ? <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.5, margin: "0 2px" }}>{g.note}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {snack ? <div style={{ position: "absolute", left: 0, right: 0, bottom: -70 }}><Snack text={snack.text} action="Deshacer" onAction={undo} /></div> : null}
+    </div>
+  );
+}
+
+window.FFOfflineHome = HomeDl;
+window.FFOfflineProfile = ProfileDl;
+window.FFOfflineDownloads = DownloadsScreen;
+})();
+const OfflineHome = (p) => React.createElement(window.FFOfflineHome, p);
+const OfflineProfile = (p) => React.createElement(window.FFOfflineProfile, p);
+const OfflineDownloads = (p) => React.createElement(window.FFOfflineDownloads, p);
+
 // ── Catalog — static grid of every screen in its reference state ──────────────
 // Non-interactive: each screen is shown inside a scaled device frame with a label.
 
@@ -5499,6 +6345,26 @@ function Catalog() {
       ],
     },
     {
+      title: "Rutinas sin conexión",
+      cells: [
+        { label: "Workout · hoy", note: "Sin descargar · botón junto a Ver rutina", el: <OfflineHome /> },
+        { label: "Workout · hoy", note: "Descargando · tocar cancela", el: <OfflineHome heroInit="loading" heroPct={64} freeze /> },
+        { label: "Workout · hoy", note: "Descargada · tocar abre la hoja para eliminarla", el: <OfflineHome heroInit="done" /> },
+        { label: "Próximas rutinas", note: "Descargada · descargando · sin descargar", el: <OfflineHome cards={["done", "loading"]} freeze scroll={330} /> },
+        { label: "Eliminar descarga", note: "Hoja al tocar una rutina descargada", el: <OfflineHome heroInit="done" sheet /> },
+        { label: "Sin conexión", note: "El plan en caché se ve completo", el: <OfflineHome heroInit="done" cards={["done"]} offline scroll={290} /> },
+        { label: "Sin conexión", note: "Hoja al abrir una rutina sin descargar", el: <OfflineHome heroInit="done" cards={["done"]} offline scroll={290} offlineSheet /> },
+        { label: "Sin conexión", note: "Hoy sin descargar · Ver rutina abre la misma hoja", el: <OfflineHome offline /> },
+        { label: "Descarga en espera", note: "Sin red queda en cola y arranca sola al volver la conexión", el: <OfflineHome heroInit="queued" cards={["queued"]} offline /> },
+        { label: "Rutina terminada", note: "Pendiente de sincronizar · se envía sola", el: <OfflineHome done="pending" offline /> },
+        { label: "Rutina terminada", note: "Error al sincronizar · Reintentar", el: <OfflineHome done="failed" /> },
+        { label: "Rutina terminada", note: "Sincronizada · ofrece eliminar la descarga", el: <OfflineHome done="synced" snack /> },
+        { label: "Perfil", note: "Fila Mis descargas", el: <OfflineProfile /> },
+        { label: "Mis descargas", note: "Por sincronizar, completadas y por hacer", el: <OfflineDownloads /> },
+        { label: "Mis descargas", note: "Sin descargas", el: <OfflineDownloads empty /> },
+      ],
+    },
+    {
       title: "Tutorial",
       cells: [
         { label: "Tutorial", note: "Usuario nuevo", el: <TutorialSheetScreen onStart={noop} onClose={noop} /> },
@@ -5546,6 +6412,17 @@ function Catalog() {
         { label: "Por lado · derecha", note: "El lado izquierdo queda marcado como hecho", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={1} /> },
         { label: "Por lado · tiempo", note: "Mismo patrón con ejercicios de tiempo", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={2} /> },
         { label: "Por lado · cola", note: "Los ejercicios por lado indican 'por lado'", el: <TrainerImmersiveScreen blocksOverride={biTrainer} blockIdx={0} stepIdx={0} queueOpen /> },
+      ],
+    },
+    {
+      title: "Modo lista",
+      cells: [
+        { label: "Modo lista", note: "En curso", el: <ListModeScreen preset="empty" /> },
+        { label: "Modo lista", note: "Rutina completa", el: <ListModeScreen preset="all" /> },
+        { label: "Instrucciones", note: "Bottom sheet al tocar un ejercicio", el: <ListModeScreen sheetOpen /> },
+        { label: "Ejercicio bilateral", note: "Sentadilla búlgara: reps por pierna", el: <ListModeScreen bilateral /> },
+        { label: "Elegir el modo", note: "Primera vez · sheet sobre el detalle de rutina", el: <FirstTimeModeSheet /> },
+        { label: "Modo de entrenamiento", note: "Perfil › Preferencias", el: <ModePreferenceScreen /> },
       ],
     },
     {

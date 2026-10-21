@@ -33,7 +33,7 @@ window.FF_DATA = {
     {
       id: "b-cycle", type: "cycle", name: "Bloque 1 — Pecho", series: 3, restBetweenSeconds: 20,
       exercises: [
-        { name: "Press de pecho mancuernas en banco inclinado", mode: "reps", reps: 15, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
+        { name: "Press de pecho mancuernas en banco inclinado", mode: "reps", reps: 15, rir: 2, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1611537610277.jpg",
           muscles: ["Pecho", "Hombro frontal", "Tríceps"], videoUrl: "https://d3gfgejixr95u4.cloudfront.net/app/staging/programs/5eeb86f7cb596824b0c7e2ff/W4IOjh2YRz-science.mp4",
           instructions: ["Ajusta el banco a 30-45° y siéntate con una mancuerna en cada mano apoyada sobre los muslos.", "Recuéstate y lleva las mancuernas a la altura del pecho, con los codos ligeramente hacia afuera.", "Empuja las mancuernas hacia arriba hasta extender los brazos sin bloquear los codos.", "Baja de forma controlada hasta sentir el estiramiento en el pecho y repite."] },
         { name: "Plancha frontal", mode: "time", timeSeconds: 30, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
@@ -47,7 +47,7 @@ window.FF_DATA = {
     {
       id: "b-stripset", type: "stripset", name: "Stripset 1", restBetweenSeconds: 30,
       exercises: [
-        { name: "Curl de bíceps con barra", sequence: [12, 10, 8, 6], img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
+        { name: "Curl de bíceps con barra", sequence: [12, 10, 8, 6], rir: 0, img: "https://d10422z5a9xpxu.cloudfront.net/V2/exercises/thumbnail-1608189905754.jpg",
           muscles: ["Bíceps", "Antebrazo"], videoUrl: "https://d10422z5a9xpxu.cloudfront.net/V2/programs/5eeb86f7cb596824b0c7e2ff/1622000401157.mp4",
           instructions: ["Toma la barra con agarre supino, separación de manos al ancho de los hombros.", "Flexiona los codos llevando la barra hacia el pecho, manteniéndolos fijos junto al torso.", "Baja la barra de forma controlada hasta extender los brazos por completo."] },
       ],
