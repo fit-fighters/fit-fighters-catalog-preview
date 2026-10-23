@@ -6229,6 +6229,278 @@ const OfflineHome = (p) => React.createElement(window.FFOfflineHome, p);
 const OfflineProfile = (p) => React.createElement(window.FFOfflineProfile, p);
 const OfflineDownloads = (p) => React.createElement(window.FFOfflineDownloads, p);
 
+// ── Cola · arrastrar para reordenar (aprobado desde draft queue-drag.jsx · pista 1a) ──
+// Aislado en su propio scope. Reemplaza a R6QueueSheet/R6QueueGroup en la cola del reproductor.
+(function () {
+const { Badge, SECTION_TYPES } = window.FitFightersDesignSystem_4614fc;
+const SHEET = {
+  "--ff-bg": "#0F0F0F", "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222",
+  "--ff-border": "#2A2A2A", "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+const GAP = 0;
+const fmt = (t) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+
+function Icon({ size = 20, stroke = "var(--ff-text)", w = 2, children }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
+}
+function Thumb({ img, size = 44, dim }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "var(--ff-surface-2)" }}>
+      {img ? <div style={{ width: "100%", height: "100%", backgroundImage: `url(${img})`, backgroundSize: "cover", backgroundPosition: "center", filter: dim ? "saturate(.2) brightness(.9)" : "none" }} /> : null}
+    </div>
+  );
+}
+function Check({ done }) {
+  return done ? (
+    <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--ff-red)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <Icon size={12} stroke="#fff" w={3}><polyline points="20 6 9 17 4 12" /></Icon>
+    </span>
+  ) : <span style={{ width: 20, height: 20, borderRadius: "50%", border: "1.5px solid var(--ff-border)", flexShrink: 0 }} />;
+}
+function SwapBtn() {
+  return (
+    <button title="Cambiar ejercicio" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", border: "1px solid #3A3A3A", background: "transparent", cursor: "pointer", flexShrink: 0 }}>
+      <Icon size={15} stroke="var(--ff-text-2)"><g><polyline points="16 5 20 9 16 13" /><line x1="20" y1="9" x2="8" y2="9" /><polyline points="8 11 4 15 8 19" /><line x1="4" y1="15" x2="16" y2="15" /></g></Icon>
+    </button>
+  );
+}
+function sectionExercises(block) {
+  if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo · ${iv.restSeconds}s descanso` }));
+  if (block.exercises) return block.exercises.map((ex) => ({ name: ex.name, img: ex.img, meta: (ex.sequence ? ex.sequence.join(" · ") + " reps" : ex.reps ? `${ex.reps} reps` : ex.timeSeconds ? fmt(ex.timeSeconds) : "Al fallo") + (ex.bilateral ? " por lado" : "") }));
+  if (block.exercise) return [{ name: block.exercise.name, img: block.exercise.img, meta: block.type === "emom" ? `${block.repsInitial} reps al minuto` : fmt(block.totalTimeSeconds || 0) }];
+  return [];
+}
+function sectionMeta(block) {
+  const label = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label;
+  if (block.type === "cycle") return `${label} · ${block.series} series`;
+  if (block.type === "fortime") return `${label} · ${block.rounds} rondas`;
+  if (block.type === "amrap") return `${label} · ${fmt(block.totalTimeSeconds)}`;
+  if (block.type === "emom") return `${label} · ${block.minutesTotal} min`;
+  if (block.type === "cardio") return `${label} · ${fmt(block.totalTimeSeconds || 0)}`;
+  return label;
+}
+function buildGroups(blocks) {
+  const groups = [];
+  blocks.forEach((b, i) => {
+    if (b.type === "rest") { if (groups.length) groups[groups.length - 1].rest = b; return; }
+    groups.push({ id: b.id, block: b, rest: null, idx: i });
+  });
+  return groups;
+}
+
+// Tres barras apiladas · 44 px de área táctil.
+function GripHandle({ active, barsRef }) {
+  return (
+    <span data-handle="1" aria-label="Arrastra para reordenar" style={{ width: 40, height: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, touchAction: "none", cursor: active ? "grabbing" : "grab" }}>
+      <span ref={barsRef} style={{ display: "flex", flexDirection: "column", gap: 3.5, color: active ? "var(--ff-red)" : "var(--ff-text-2)" }}>
+        {[0, 1, 2].map((k) => <span key={k} style={{ width: 18, height: 2, borderRadius: 1, background: "currentColor" }} />)}
+      </span>
+    </span>
+  );
+}
+
+function Lock({ size = 18 }) {
+  return <Icon size={size} stroke="var(--ff-text-3)"><g><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></g></Icon>;
+}
+// Magnitud de la sección sin la etiqueta de tipo: "3 series", "8 rondas", "07:00".
+function sectionAmount(block) {
+  if (block.type === "cycle" || block.type === "stripset") return block.series ? `${block.series} series` : "";
+  if (block.type === "fortime") return block.rounds ? `${block.rounds} rondas` : "";
+  if (block.type === "emom") return block.minutesTotal ? `${block.minutesTotal} min` : "";
+  return block.totalTimeSeconds ? fmt(block.totalTimeSeconds) : "";
+}
+const eyebrow = { fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 500, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" };
+
+function QueueGroup({ group, status, open, onToggle, lifted, cardRef, barsRef }) {
+  const { block, rest } = group;
+  const list = sectionExercises(block);
+  const single = list.length === 1;
+  const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
+  const done = status === "done";
+  const current = status === "current";
+  const amount = sectionAmount(block);
+  const meta = single ? [list[0].meta, amount].filter((x, i, arr) => x && arr.indexOf(x) === i).join(" · ") : amount;
+  return (
+    <div ref={cardRef} style={{
+      background: lifted ? "var(--ff-surface-2)" : "var(--ff-surface)", borderRadius: lifted ? 14 : 0, borderBottom: "1px solid " + (lifted ? "transparent" : "var(--ff-border)"),
+      opacity: done && !lifted ? 0.55 : 1, transform: lifted ? "scale(1.02)" : "none", boxShadow: lifted ? "0 14px 30px rgba(0,0,0,.55)" : "none",
+      transition: "transform 160ms ease, box-shadow 160ms ease, background 160ms ease", userSelect: "none", WebkitUserSelect: "none",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 4px 10px 0" }}>
+        <span style={{ width: 28, display: "flex", justifyContent: "center", flexShrink: 0 }}>{current ? <Lock /> : done ? <Check done /> : null}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {current && <span style={{ width: 3, height: 52, borderRadius: 2, background: "var(--ff-red)" }} />}
+          <Thumb img={(list[0] || {}).img} size={56} dim={done} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", width: 7, height: 7, borderRadius: "50%", background: color }} />
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: "7px 0 0", lineHeight: 1.35, letterSpacing: "-.2px", overflowWrap: "anywhere" }}>{single ? list[0].name : block.name}</p>
+          {meta ? <p style={{ ...eyebrow, margin: "5px 0 0" }}>{meta}</p> : null}
+        </div>
+        {!current && <GripHandle active={lifted} barsRef={barsRef} />}
+        {single && <SwapBtn />}
+      </div>
+      {!single && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 4px 4px 38px" }}>
+          {list.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 0" }}>
+              <Thumb img={it.img} size={44} />
+              <Lock size={14} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", margin: 0, lineHeight: 1.3 }}>{it.name}</p>
+                <p style={{ ...eyebrow, fontSize: 10.5, margin: "3px 0 0" }}>{it.meta}</p>
+              </div>
+              <SwapBtn />
+            </div>
+          ))}
+        </div>
+      )}
+      {rest && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 4px 14px 30px" }}>
+          <Icon size={15} stroke="var(--ff-text-3)"><g><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></g></Icon>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Descanso · {fmt(rest.timeSeconds)} — viaja con este bloque</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// hint="nudge": la primera vez que se abre la cola, la primera pendiente salta, se eleva y sus barras se encienden.
+function QueueSheetDnD({ currentIdx = 2, hint, frozenDrag }) {
+  // Las completadas salen de la cola; la actual queda anclada arriba y no se mueve.
+  const [groups, setGroups] = React.useState(() => buildGroups(window.FF_DATA.trainerBlocks || []).filter((g) => g.idx >= currentIdx));
+  const [closedIds, setClosedIds] = React.useState([]);
+  const [drag, setDrag] = React.useState(null);
+  const [showTip, setShowTip] = React.useState(true);
+  const listRef = React.useRef(null);
+  const rows = React.useRef([]);
+  const cards = React.useRef([]);
+  const bars = React.useRef([]);
+  const d = React.useRef(null);
+  const press = React.useRef(null);
+  const statusOf = (g) => (g.idx < currentIdx ? "done" : g.idx === currentIdx ? "current" : "pending");
+  const firstPending = groups.findIndex((g) => g.idx > currentIdx);
+  const bgImg = (sectionExercises((groups.find((g) => g.idx === currentIdx) || groups[0]).block)[0] || {}).img;
+
+  const measure = () => rows.current.slice(0, groups.length).map((el) => ({ top: el.offsetTop, h: el.offsetHeight }));
+  const start = (i, y) => {
+    d.current = { from: i, y0: y, y, s0: listRef.current.scrollTop, m: measure(), to: i };
+    if (navigator.vibrate) navigator.vibrate(10);
+    setDrag({ from: i, dy: 0, to: i });
+    autoScroll();
+  };
+  const update = () => {
+    const c = d.current; if (!c) return;
+    const dy = c.y - c.y0 + (listRef.current.scrollTop - c.s0);
+    const mid = c.m[c.from].top + c.m[c.from].h / 2 + dy;
+    let to = c.from;
+    for (let j = c.from + 1; j < c.m.length; j++) if (mid > c.m[j].top + c.m[j].h / 2) to = j;
+    for (let j = c.from - 1; j >= 0; j--) if (mid < c.m[j].top + c.m[j].h / 2) to = j;
+    if (statusOf(groups[0]) === "current") to = Math.max(1, to);
+    c.to = to;
+    setDrag({ from: c.from, dy, to });
+  };
+  const autoScroll = () => {
+    const c = d.current, el = listRef.current; if (!c || !el) return;
+    const r = el.getBoundingClientRect();
+    const edge = 56;
+    const v = c.y < r.top + edge ? -(r.top + edge - c.y) / 4 : c.y > r.bottom - edge ? (c.y - (r.bottom - edge)) / 4 : 0;
+    if (v) { el.scrollTop += v; update(); }
+    c.raf = requestAnimationFrame(autoScroll);
+  };
+  const end = () => {
+    const c = d.current; d.current = null;
+    if (!c) return;
+    cancelAnimationFrame(c.raf);
+    if (c.to !== c.from) {
+      const next = groups.slice(); const [m] = next.splice(c.from, 1); next.splice(c.to, 0, m);
+      setGroups(next); setShowTip(false);
+    }
+    setDrag(null);
+  };
+  const shiftOf = (j) => {
+    if (!drag || !d.current || j === drag.from) return 0;
+    const H = d.current.m[drag.from].h + GAP;
+    if (drag.from < drag.to && j > drag.from && j <= drag.to) return -H;
+    if (drag.to < drag.from && j >= drag.to && j < drag.from) return H;
+    return 0;
+  };
+  const onDown = (i) => (e) => {
+    if (frozenDrag != null || statusOf(groups[i]) === "current") return;
+    const y = e.clientY;
+    if (e.target.closest("[data-handle]")) {
+      e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); start(i, y); return;
+    }
+    if (e.target.closest("button")) return;
+    const el = e.currentTarget, id = e.pointerId;
+    press.current = { y, t: setTimeout(() => { try { el.setPointerCapture(id); } catch (_) {} start(i, press.current ? press.current.y : y); }, 350) };
+  };
+  const onMove = (e) => {
+    if (d.current) { d.current.y = e.clientY; update(); return; }
+    if (press.current && Math.abs(e.clientY - press.current.y) > 8) { clearTimeout(press.current.t); press.current = null; }
+  };
+  const onUp = () => { if (press.current) { clearTimeout(press.current.t); press.current = null; } end(); };
+
+  // Estado congelado para el catálogo.
+  React.useEffect(() => {
+    if (frozenDrag == null) return;
+    const m = measure();
+    d.current = { from: frozenDrag, y0: 0, y: m[frozenDrag].h / 2 + GAP + m[frozenDrag + 1].h * 0.7, s0: listRef.current.scrollTop, m, to: frozenDrag };
+    update();
+  }, []);
+
+  // Pista al abrir la cola.
+  React.useEffect(() => {
+    if (!hint || frozenDrag != null || firstPending < 0) return;
+    const t = firstPending, row = rows.current[t], card = cards.current[t], bar = bars.current[t];
+    const anims = [];
+    const id = setTimeout(() => {
+      const lift = [{ boxShadow: "none", background: "var(--ff-surface)" }, { boxShadow: "0 14px 30px rgba(0,0,0,.55)", background: "var(--ff-surface-2)", offset: 0.2 }, { boxShadow: "0 14px 30px rgba(0,0,0,.55)", background: "var(--ff-surface-2)", offset: 0.8 }, { boxShadow: "none", background: "var(--ff-surface)" }];
+      const glow = [{ color: "var(--ff-text-2)" }, { color: "#FF3200", offset: 0.15 }, { color: "#FF3200", offset: 0.85 }, { color: "var(--ff-text-2)" }];
+      if (hint === "nudge") {
+        anims.push(row.animate([{ transform: "translateY(0)" }, { transform: "translateY(-10px)", offset: 0.25 }, { transform: "translateY(0)", offset: 0.5 }, { transform: "translateY(-5px)", offset: 0.7 }, { transform: "translateY(0)" }], { duration: 1000, easing: "ease-in-out" }));
+        anims.push(card.animate(lift, { duration: 1000 }), bar.animate(glow, { duration: 1300 }));
+      }
+    }, 600);
+    return () => { clearTimeout(id); anims.forEach((a) => a.cancel()); };
+  }, []);
+
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end", ...SHEET }}>
+      <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${bgImg})`, backgroundSize: "cover", backgroundPosition: "center top", filter: "brightness(.45)" }} />
+      <div style={{ position: "relative", height: "80%", display: "flex", flexDirection: "column", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "26px 10px 10px 20px", flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: 0, letterSpacing: "-.4px" }}>Cola</p>
+            {showTip && <span style={{ fontFamily: "var(--font-body)", fontSize: 11.5, color: "var(--ff-text-3)" }}>Arrastra desde las barras para reordenar</span>}
+          </div>
+          <button aria-label="Cerrar" style={{ width: 44, height: 44, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <Icon size={22} stroke="var(--ff-text)"><g><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></g></Icon>
+          </button>
+        </div>
+        <div ref={listRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 22px", display: "flex", flexDirection: "column", gap: GAP, position: "relative" }}>
+          {groups.map((g, i) => {
+            const lifted = drag && drag.from === i;
+            return (
+              <div key={g.id} ref={(el) => { rows.current[i] = el; }}
+                onPointerDown={onDown(i)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+                style={{ position: "relative", zIndex: lifted ? 3 : 1, transform: `translateY(${lifted ? drag.dy : shiftOf(i)}px)`, transition: lifted || !drag ? "none" : "transform 180ms ease" }}>
+                <QueueGroup group={g} status={statusOf(g)} open={!closedIds.includes(g.id)} lifted={!!lifted}
+                  onToggle={() => setClosedIds((c) => (c.includes(g.id) ? c.filter((x) => x !== g.id) : [...c, g.id]))}
+                  cardRef={(el) => { cards.current[i] = el; }} barsRef={(el) => { bars.current[i] = el; }} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+window.FFQueueSheetDnD = QueueSheetDnD;
+})();
+const QueueSheetDnD = (p) => React.createElement(window.FFQueueSheetDnD, p);
+
 // ── Catalog — static grid of every screen in its reference state ──────────────
 // Non-interactive: each screen is shown inside a scaled device frame with a label.
 
@@ -6404,6 +6676,8 @@ function Catalog() {
         { label: "Descanso", note: "Video desaturado y anillo gris de descanso", el: <TrainerImmersiveScreen blockIdx={1} /> },
         { label: "En pausa", el: <TrainerImmersiveScreen blockIdx={0} paused /> },
         { label: "Cola", note: "Cola por secciones sobre fondo oscuro sólido", el: <TrainerImmersiveScreen blockIdx={2} queueOpen /> },
+        { label: "Cola · reordenar", note: "La actual queda anclada con candado · la primera pendiente salta al abrir", el: <QueueSheetDnD hint="nudge" /> },
+        { label: "Cola · arrastrando", note: "La card se eleva y las demás se recorren", el: <QueueSheetDnD frozenDrag={1} /> },
         { label: "Prepárate", note: "modal 3-2-1 al iniciar sección o al reanudar", el: <TrainerImmersiveScreen blockIdx={0} showPreroll /> },
         { label: "Último ejercicio", note: "La card de abajo pasa a 'Finalizar entrenamiento'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} /> },
         { label: "Rutina completa", note: "Al dar siguiente o acabar el tiempo: cola desplegada y 'Finalizar rutina'", el: <TrainerImmersiveScreen blockIdx={10} stepIdx={5} finishOpen /> },
