@@ -6501,6 +6501,2053 @@ window.FFQueueSheetDnD = QueueSheetDnD;
 })();
 const QueueSheetDnD = (p) => React.createElement(window.FFQueueSheetDnD, p);
 
+// ── Modo pro · registro de pesos, reps y sensación (aprobado 23 oct 2026; v2: tabla de series, cambiar ejercicio, resumen con pesos) ──
+// Copias de piezas aprobadas de app.jsx (reproductor inmersivo, modo lista, modo de entrenamiento)
+// con el registro de peso añadido. No toca app.jsx.
+(function () {
+const { Button, AppBar, BottomNav, Card, MenuRow, Badge, SectionBadge, SECTION_TYPES, Chip, TextField } = window.FitFightersDesignSystem_4614fc;
+// Ejercicios sin carga externa: no piden peso.
+const BODYWEIGHT = ["Flexiones", "Burpees", "Plancha frontal", "Trote continuo", "Sprint en cinta", "Sentadilla con salto", "Mountain climbers", "Jumping jacks", "Fondos en banco"];
+function loadedForPre(r) { const d = r.ex.desc || {}; return d.kind !== "time" && !(d.kind === "repeats" && !d.reps) && BODYWEIGHT.indexOf(r.ex.name) < 0; }
+const LAST_KG = { "Press de pecho mancuernas en banco inclinado": 20, "Curl de bíceps con barra": 25, "Thruster con mancuernas": 12.5, "Swing con kettlebell": 16, "Press con barra": 30, "Peso muerto con barra": 60, "Sentadilla goblet": 20 };
+function lastKg(name) { return LAST_KG[name] ?? 20; }
+function isLoaded(ex) { return !!ex && ex.mode !== "time" && ex.mode !== "failure" && BODYWEIGHT.indexOf(ex.name) < 0; }
+function isLoadedRow(r) { const d = r.ex.desc || {}; return d.kind !== "time" && d.kind !== "emom" && !(d.kind === "repeats" && !d.reps) && BODYWEIGHT.indexOf(r.ex.name) < 0; }
+function wPrevOf(blocks, i) {
+  const p = blocks[i - 1];
+  if (!p) return null;
+  const ex = p.exercises ? (p.exercises.filter(isLoaded).pop() || p.exercises[0]) : p.exercise;
+  return { ex, serie: p.series ? [p.series, p.series] : null };
+}
+function fmtKg(v) { return v == null ? "—" : String(Math.round(v * 10) / 10); }
+const STEP = 2.5;
+function StepBtn({ minus, size = 56, onClick, onImage }) {
+  return (
+    <button onClick={onClick} aria-label={minus ? "Menos peso" : "Más peso"} style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+      background: onImage ? "rgba(255,255,255,.08)" : "var(--ff-surface-2)", border: "1px solid " + (onImage ? "rgba(255,255,255,.2)" : "var(--ff-border)"), color: onImage ? "#fff" : "var(--ff-text)" }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" />{minus ? null : <line x1="12" y1="5" x2="12" y2="19" />}</svg>
+    </button>
+  );
+}
+function KgInput({ kg, setKg, size = 44, color = "var(--ff-text)", suffix = "kg" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 6, minWidth: 0 }}>
+      <input value={kg == null ? "" : fmtKg(kg)} placeholder="0" inputMode="decimal" aria-label="Peso en kg"
+        onChange={(e) => { const v = e.target.value.replace(",", "."); const n = parseFloat(v); setKg(v === "" || isNaN(n) ? null : n); }}
+        style={{ width: ((kg == null ? 1 : fmtKg(kg).length) + 0.6) * size * 0.95, background: "transparent", border: "none", outline: "none", textAlign: "right", padding: 0, fontFamily: "var(--font-display)", fontSize: size, letterSpacing: "-1px", color, fontVariantNumeric: "tabular-nums" }} />
+      <span style={{ fontFamily: "var(--font-body)", fontSize: Math.max(11, Math.round(size * 0.34)), fontWeight: 600, color: "var(--ff-text-3)" }}>{suffix}</span>
+    </div>
+  );
+}
+// Hoja única de registro: se usa en la lista y en el entrenador.
+function WeightSheet({ ex, serie, block, note, kg, setKg, cta = "Guardar", skip, onSave, onSkip, onClose }) {
+  const last = lastKg(ex.name);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 18, boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{serie ? "Serie " + serie[0] + " de " + serie[1] : block || "Peso"}</span>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.35, margin: 0, textWrap: "pretty" }}>{ex.name}</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <StepBtn minus onClick={() => setKg((k) => Math.max(0, k - STEP))} />
+          <KgInput kg={kg} setKg={setKg} />
+          <StepBtn onClick={() => setKg((k) => k + STEP)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: 0 }}>La última vez: <span style={{ fontWeight: 600, color: "var(--ff-text)" }}>{fmtKg(last)} kg</span></p>
+          {note ? <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.45, margin: 0, textAlign: "center", maxWidth: 280, textWrap: "pretty" }}>{note}</p> : null}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <Button onClick={onSave}>{cta}</Button>
+          {skip ? <Button variant="text" onClick={onSkip}>Omitir</Button> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+const CAUTION = "Recuerda que cargar más peso no es señal de mejores resultados. Evita lesiones.";
+function Caution({ onImage }) {
+  return (
+    <p style={{ display: "flex", gap: 7, alignItems: "flex-start", fontFamily: "var(--font-body)", fontSize: 11.5, lineHeight: 1.45, color: onImage ? "rgba(255,255,255,.62)" : "var(--ff-text-3)", margin: 0, textWrap: "pretty" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+      <span>{CAUTION}</span>
+    </p>
+  );
+}
+// Primera vez: campo manual. Toca el número y se abre el teclado.
+function KgField({ kg, setKg, onImage, width = 96, height = 44, autoFocus }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 4, width, height, boxSizing: "border-box", padding: "0 12px", borderRadius: 12, flexShrink: 0, cursor: "text",
+      background: onImage ? "rgba(255,255,255,.08)" : "var(--ff-surface-2)", border: "1px solid " + (onImage ? "rgba(255,255,255,.28)" : "var(--ff-border)") }}>
+      <input value={kg == null ? "" : fmtKg(kg)} placeholder="0" inputMode="decimal" aria-label="Peso en kg" autoFocus={autoFocus}
+        onChange={(e) => { const v = e.target.value.replace(",", "."); const n = parseFloat(v); setKg(v === "" || isNaN(n) ? null : n); }}
+        style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", padding: 0, textAlign: "right", fontFamily: "var(--font-display)", fontSize: 16, color: onImage ? "#fff" : "var(--ff-text)", fontVariantNumeric: "tabular-nums" }} />
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, color: onImage ? "rgba(255,255,255,.55)" : "var(--ff-text-3)" }}>kg</span>
+    </label>
+  );
+}
+// Unidad por ejercicio: mancuernas suelen ir en kg, discos de máquina en lb.
+const UNIT_STEP = { kg: 2.5, lb: 5 };
+function UnitToggle({ unit, setUnit, onImage }) {
+  const off = onImage ? "rgba(255,255,255,.6)" : "var(--ff-text-3)";
+  return (
+    <div role="radiogroup" aria-label="Unidad" style={{ display: "inline-flex", height: 26, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid " + (onImage ? "rgba(255,255,255,.22)" : "var(--ff-border)"), flexShrink: 0 }}>
+      {["kg", "lb"].map((u) => (
+        <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 30, padding: "0 8px", borderRadius: 999, border: "none", cursor: "pointer",
+          background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : off, fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+      ))}
+    </div>
+  );
+}
+const FEELS = ["Ligera", "Moderada", "Muy pesada"];
+function FeelPicker({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff" }}>¿Cómo sentiste tu serie?</span>
+      <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+        {FEELS.map((f) => {
+          const on = value === f;
+          return (
+            <button key={f} role="radio" aria-checked={on} onClick={() => onChange(f)} style={{ height: 44, borderRadius: 12, cursor: "pointer", padding: "0 4px",
+              background: on ? "#fff" : "rgba(255,255,255,.06)", border: "1px solid " + (on ? "#fff" : "rgba(255,255,255,.2)"), color: on ? "#0B0B0B" : "rgba(255,255,255,.85)",
+              fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>{f}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function StepRow({ label, extra, value, setValue, step, suffix }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 5 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 9.5, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.55)" }}>{label}</span>
+        {extra}
+      </div>
+      <StepBtn minus size={40} onImage onClick={() => setValue((k) => Math.max(0, (k || 0) - step))} />
+      <div style={{ width: 92, display: "flex", justifyContent: "center" }}><KgInput kg={value} setKg={setValue} size={20} color="#fff" suffix={suffix} /></div>
+      <StepBtn size={40} onImage onClick={() => setValue((k) => (k || 0) + step)} />
+    </div>
+  );
+}
+// Descanso (1c): al terminar la serie se pregunta cómo se sintió y se registran peso y reps.
+// Peso y reps llegan precargados (último peso, reps del plan) y se muestran informativos; editar es opcional.
+function WeightRestCard({ ex, serie, kg, setKg, initial = "info", feel: feel0 = null }) {
+  const [mode, setMode] = React.useState(kg == null ? "first" : initial);
+  const [reps, setReps] = React.useState(ex.reps || null);
+  const [unit, setUnit] = React.useState("kg");
+  const [feel, setFeel] = React.useState(feel0);
+  const box = { width: "100%", boxSizing: "border-box", marginTop: 4, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 14, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 12 };
+  const eyebrow = { fontFamily: "var(--font-body)", fontSize: 9.5, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.55)" };
+  const textBtn = (label, onClick, strong) => (
+    <button onClick={onClick} style={{ height: 44, padding: "0 4px 0 12px", marginRight: -4, background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 11.5, letterSpacing: "-.2px", color: strong ? "var(--ff-red)" : "#fff", flexShrink: 0 }}>{label}</button>
+  );
+  const editing = mode !== "info";
+  const unitTxt = { fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.55)", marginLeft: 3 };
+  return (
+    <div style={box}>
+      <div style={{ minWidth: 0 }}>
+        <span style={eyebrow}>{serie ? "Serie " + serie[0] + " de " + serie[1] + " terminada" : "Serie terminada"}</span>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 11.5, color: "#fff", margin: "3px 0 0", letterSpacing: "-.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.name}</p>
+      </div>
+      <StepRow label="¿Cuántas reps hiciste?" value={reps} setValue={setReps} step={1} suffix="reps" />
+      {!serie || serie[0] === serie[1] ? <FeelPicker value={feel} onChange={setFeel} /> : null}
+      <div style={{ height: 1, background: "rgba(255,255,255,.12)" }} />
+      {editing ? (
+        <>
+          <StepRow label="Peso" extra={<UnitToggle unit={unit} setUnit={setUnit} onImage />} value={kg} setValue={setKg} step={UNIT_STEP[unit]} suffix={unit} />
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}><Caution onImage /></div>
+            {textBtn(mode === "first" ? "Guardar" : "Listo", () => kg != null && setMode("info"), true)}
+          </div>
+        </>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: -6, marginBottom: -8 }}>
+          <span style={{ ...eyebrow, flexShrink: 0 }}>Peso</span>
+          <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 15, color: "#fff", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{fmtKg(kg)}<span style={unitTxt}>{unit}</span></span>
+          {textBtn("Editar", () => setMode("edit"))}
+        </div>
+      )}
+    </div>
+  );
+}
+// Secciones contra reloj (2a): sin descansos, así que el peso se pide antes de empezar.
+function PreWeightRow({ ex, kg, setKg, isLast }) {
+  const had = LAST_KG[ex.name] != null;
+  const [unit, setUnit] = React.useState("kg");
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: isLast ? "none" : "1px solid #2A2A2A" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 5 }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "#fff", margin: 0, lineHeight: 1.3, textWrap: "pretty" }}>{ex.name}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 11.5, color: "rgba(255,255,255,.5)", margin: 0 }}>{had ? "La última vez " + fmtKg(LAST_KG[ex.name]) + " kg" : "Primera vez"}</p>
+        <UnitToggle unit={unit} setUnit={setUnit} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+        <StepBtn minus size={40} onClick={() => setKg((k) => Math.max(0, (k || 0) - UNIT_STEP[unit]))} />
+        <KgInput kg={kg} setKg={setKg} size={18} suffix={unit} />
+        <StepBtn size={40} onClick={() => setKg((k) => (k || 0) + UNIT_STEP[unit])} />
+      </div>
+    </div>
+  );
+}
+function PreSectionWeights({ block, color, onStart, onSkip, isLastSection, exList, listMode }) {
+  const emom = block.type === "emom";
+  const list = exList || (block.exercises || (block.exercise ? [block.exercise] : [])).filter(isLoaded);
+  const [kgs, setKgs] = React.useState(() => Object.fromEntries(list.map((x) => [x.name, LAST_KG[x.name] ?? null])));
+  const label = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label;
+  const meta = block.type === "fortime" ? block.rounds + " rondas" : block.type === "emom" ? block.minutesTotal + " min" : fmtCountdown(block.totalTimeSeconds || 0);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 70, display: "flex", flexDirection: "column", justifyContent: "flex-end", ...R7_SHEET }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.6)" }} />
+      <div style={{ position: "relative", maxHeight: "86%", display: "flex", flexDirection: "column", background: "#1A1A1A", borderRadius: "32px 32px 0 0", boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 14px", flexShrink: 0 }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "#2A2A2A" }} /></div>
+        <div style={{ padding: "0 20px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color }}>{label} · {meta}</span>
+        </div>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: "0 0 8px", letterSpacing: "-.3px", lineHeight: 1.35 }}>Antes de empezar</p>
+        {emom ? (
+          <>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: "0 0 12px", textWrap: "pretty" }}>Cada minuto en punto haces las repeticiones indicadas; el tiempo que te sobre dentro del minuto es tu descanso.</p>
+            {listMode ? null : <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "11px 12px", marginBottom: 12 }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <R6Icon size={13} stroke="var(--ff-red)" w={2.4}><polyline points="20 6 9 17 4 12" /></R6Icon>
+              </span>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: 0, textWrap: "pretty" }}>{isLastSection ? "Cuando ya no completes las reps del minuto, toca este botón: es la última sección, tu rutina finalizaría." : "Cuando ya no completes las reps del minuto, toca este botón: cierras esta sección y pasas a la siguiente."}</p>
+            </div>}
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: "0 0 6px", textWrap: "pretty" }}>{listMode ? "Anota el peso que vas a usar antes de empezar." : "Como esta sección corre contra el tiempo y no te vamos a interrumpir, anota el peso que vas a usar."}</p>
+          </>
+        ) : (
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: "0 0 6px", textWrap: "pretty" }}>{listMode ? "Esta sección corre contra el tiempo. Anota el peso que vas a usar antes de empezar." : "Esta sección corre contra el tiempo y no te vamos a interrumpir. Anota el peso que vas a usar."}</p>
+        )}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 20px", borderBottom: "1px solid #2A2A2A" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {list.map((x, i) => <PreWeightRow key={x.name} ex={x} kg={kgs[x.name]} isLast={i === list.length - 1} setKg={(f) => setKgs((o) => ({ ...o, [x.name]: typeof f === "function" ? f(o[x.name]) : f }))} />)}
+        </div>
+        </div>
+        <div style={{ padding: "14px 20px 22px", flexShrink: 0 }}>
+        <Caution />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 14 }}>
+          <button onClick={() => onStart(kgs)} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px", cursor: "pointer" }}>Comenzar sección</button>
+          <button onClick={onSkip} style={{ width: "100%", height: 44, borderRadius: 10, border: "none", background: "transparent", color: "rgba(255,255,255,.75)", fontFamily: "var(--font-display)", fontSize: 12, letterSpacing: "-.2px", cursor: "pointer" }}>Omitir</button>
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ── Modo lista pro: registro serie por serie ──
+function logRow(r) { const d = r.ex.desc || {}; return d.kind !== "time" && d.kind !== "emom"; }
+function repsOf(r) { const d = r.ex.desc || {}; if (d.kind === "repeats") return d.reps || null; if (d.kind === "stripset") return d.reps[0]; return null; }
+function LStepRow({ label, extra, value, setValue, step, suffix }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 5 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{label}</span>
+        {extra}
+      </div>
+      <StepBtn minus size={44} onClick={() => setValue((k) => Math.max(0, (k || 0) - step))} />
+      <div style={{ width: 96, display: "flex", justifyContent: "center" }}><KgInput kg={value} setKg={setValue} size={20} suffix={suffix} /></div>
+      <StepBtn size={44} onClick={() => setValue((k) => (k || 0) + step)} />
+    </div>
+  );
+}
+function LFeelPicker({ value, onChange, label = "¿Cómo sentiste tu serie?" }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text)" }}>{label}</span>
+      <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+        {FEELS.map((f) => {
+          const on = value === f;
+          return (
+            <button key={f} role="radio" aria-checked={on} onClick={() => onChange(f)} style={{ height: 44, borderRadius: 12, cursor: "pointer", padding: "0 4px",
+              background: on ? "var(--ff-text)" : "transparent", border: "1px solid " + (on ? "var(--ff-text)" : "var(--ff-border)"), color: on ? "var(--ff-bg)" : "var(--ff-text-2)",
+              fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>{f}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+// Al terminar una serie: reps de cada ejercicio (obligatorias), peso informativo y editable,
+// y en la última serie «¿Cómo sentiste tu serie?» (obligatoria).
+function SeriesSheet({ block, serie, total, prev, onSave, onClose }) {
+  const rows = block.rows.filter(logRow);
+  const last = serie >= total;
+  const [ent, setEnt] = React.useState(() => Object.fromEntries(rows.map((r) => {
+    const p = prev && prev[r.ex.name];
+    const kg = p ? p.kg : (LAST_KG[r.ex.name] ?? null);
+    return [r.ex.name, { reps: repsOf(r), kg, unit: p ? p.unit : "kg", feel: null, edit: isLoadedRow(r) && kg == null }];
+  })));
+  const set = (n, k, v) => setEnt((o) => ({ ...o, [n]: { ...o[n], [k]: typeof v === "function" ? v(o[n][k]) : v } }));
+  const [feel, setFeel] = React.useState(null);
+  const anyEdit = rows.some((r) => ent[r.ex.name].edit);
+  const ready = (!last || !!feel) && rows.every((r) => ent[r.ex.name].reps != null && (!isLoadedRow(r) || ent[r.ex.name].kg != null));
+  const eyebrow = { fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" };
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+      <div style={{ position: "relative", maxHeight: "88%", display: "flex", flexDirection: "column", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", padding: "10px 0 12px", cursor: "pointer", flexShrink: 0 }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        <div style={{ padding: "0 20px 6px", flexShrink: 0 }}>
+          <span style={eyebrow}>Serie {serie} de {total} terminada</span>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "4px 0 0" }}>{block.name}</p>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 20px" }}>
+          {rows.map((r) => {
+            const e = ent[r.ex.name], loaded = isLoadedRow(r);
+            return (
+              <div key={r.ex.name} style={{ display: "flex", flexDirection: "column", gap: 12, padding: "14px 0", borderTop: "1px solid var(--ff-border)" }}>
+                <div>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0, lineHeight: 1.3, textWrap: "pretty" }}>{r.ex.name}</p>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: "2px 0 0" }}>Objetivo: {r.target}</p>
+                </div>
+                <LStepRow label="Reps hechas" value={e.reps} setValue={(v) => set(r.ex.name, "reps", v)} step={1} suffix="reps" />
+                {loaded ? (e.edit ? (
+                  <LStepRow label="Peso" extra={<UnitToggle unit={e.unit} setUnit={(u) => set(r.ex.name, "unit", u)} />} value={e.kg} setValue={(v) => set(r.ex.name, "kg", v)} step={UNIT_STEP[e.unit]} suffix={e.unit} />
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "-6px 0" }}>
+                    <span style={{ ...eyebrow, flexShrink: 0, width: 46 }}>Peso</span>
+                    <span style={{ flex: 1, fontFamily: "var(--font-display)", fontSize: 15, color: "var(--ff-text)", fontVariantNumeric: "tabular-nums" }}>{fmtKg(e.kg)}<span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-text-3)", marginLeft: 3 }}>{e.unit}</span></span>
+                    <button onClick={() => set(r.ex.name, "edit", true)} style={{ height: 44, padding: "0 2px 0 12px", background: "transparent", border: "none", cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 11.5, color: "var(--ff-text)" }}>Editar</button>
+                  </div>
+                )) : null}
+              </div>
+            );
+          })}
+          {last ? <div style={{ padding: "16px 0", borderTop: "1px solid var(--ff-border)" }}><LFeelPicker value={feel} onChange={setFeel} /></div> : null}
+        </div>
+        <div style={{ padding: "12px 20px 22px", borderTop: "1px solid var(--ff-border)", display: "flex", flexDirection: "column", gap: 12, flexShrink: 0 }}>
+          {anyEdit ? <Caution /> : null}
+          <Button disabled={!ready} onClick={() => onSave(Object.fromEntries(rows.map((r) => [r.ex.name, ent[r.ex.name]])), feel)}>{last ? "Guardar y completar sección" : "Guardar serie"}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+// Contra reloj en lista: al terminar la sección solo se pregunta cómo se sintió.
+function TimeField({ mm, ss, setMm, setSs }) {
+  const box = (v, set, label) => (
+    <label style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      <input value={v} placeholder="00" inputMode="numeric" maxLength={2} aria-label={label}
+        onChange={(e) => set(e.target.value.replace(/\D/g, "").slice(0, 2))}
+        style={{ width: 84, height: 60, boxSizing: "border-box", borderRadius: 14, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", outline: "none", textAlign: "center", fontFamily: "var(--font-display)", fontSize: 28, color: "var(--ff-text)", fontVariantNumeric: "tabular-nums" }} />
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{label}</span>
+    </label>
+  );
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 10 }}>
+      {box(mm, setMm, "Min")}
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--ff-text-3)", lineHeight: "60px" }}>:</span>
+      {box(ss, setSs, "Seg")}
+    </div>
+  );
+}
+// Resultado por tipo: For time = tiempo, AMRAP = reps totales, EMOM = minutos completados.
+function FeelSheet({ block, onSave, onClose }) {
+  const [f, setF] = React.useState(null);
+  const t = block.type;
+  const [mm, setMm] = React.useState(""), [ss, setSs] = React.useState("");
+  const [reps, setReps] = React.useState(null);
+  const [mins, setMins] = React.useState(null);
+  const result = t === "fortime" ? mm !== "" && ss !== "" : t === "amrap" ? reps != null : t === "emom" ? mins != null : true;
+  const q = { fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text)", margin: "0 0 10px" };
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 22px", display: "flex", flexDirection: "column", gap: 18, boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        <div>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Sección terminada</span>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "4px 0 0" }}>{block.name}</p>
+        </div>
+        {t === "fortime" ? <div><p style={q}>¿En cuánto tiempo la completaste?</p><TimeField mm={mm} ss={ss} setMm={setMm} setSs={setSs} /></div> : null}
+        {t === "amrap" ? <div><p style={q}>¿Cuántas rondas completaste?</p><LStepRow label="Rondas completas" value={reps} setValue={setReps} step={1} suffix="rondas" /></div> : null}
+        {t === "emom" ? <div><p style={q}>¿Cuántos minutos lograste completar?</p><LStepRow label={"De " + block.n + " min"} value={mins} setValue={(v) => setMins((m) => { const n = typeof v === "function" ? v(m) : v; return n == null ? null : Math.min(block.n, n); })} step={1} suffix="min" /></div> : null}
+        <div style={{ height: 1, background: "var(--ff-border)" }} />
+        <LFeelPicker value={f} onChange={setF} label="¿Cómo sentiste la sección?" />
+        <Button disabled={!f || !result} onClick={() => onSave(f)}>Completar sección</Button>
+      </div>
+    </div>
+  );
+}
+// Modo lista: una pastilla por ejercicio, a la derecha del objetivo.
+function KgPill({ value, done, onClick }) {
+  const has = value != null;
+  return (
+    <button onClick={onClick} aria-label="Registrar peso" style={{ height: 36, minWidth: 66, padding: "0 10px", flexShrink: 0, borderRadius: 10, cursor: "pointer", boxSizing: "border-box",
+      background: has ? "var(--ff-surface-2)" : "transparent", border: (has ? "1px solid " : "1px dashed ") + "var(--ff-border)",
+      fontFamily: "var(--font-body)", fontSize: 13, fontWeight: has ? 600 : 500, fontVariantNumeric: "tabular-nums", color: has ? (done ? "var(--ff-text-3)" : "var(--ff-text)") : "var(--ff-text-3)" }}>
+      {has ? fmtKg(value) + " kg" : "+ kg"}
+    </button>
+  );
+}
+
+function fmtCountdown(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+const BI_SIDES = ["izq", "der"];
+function biSides(ex) { return ex && ex.bilateral ? BI_SIDES : [null]; }
+function biSideFull(limb, s) {
+  if (limb === "pierna") return s === "izq" ? "Pierna izquierda" : "Pierna derecha";
+  if (limb === "brazo") return s === "izq" ? "Brazo izquierdo" : "Brazo derecho";
+  return s === "izq" ? "Lado izquierdo" : "Lado derecho";
+}
+
+// Detalle: el ejercicio aparece una vez por lado, cada renglón etiquetado con su lado.
+function BilateralExerciseRows({ ex, isLast, onTap }) {
+  return (
+    <div>
+      {BI_SIDES.map((s, k) => (
+        <div key={s} onClick={onTap} style={{ display: "flex", alignItems: "center", gap: 12, padding: k ? "7px 16px 13px" : "13px 16px 7px", cursor: onTap ? "pointer" : "default" }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ff-surface-2)", flexShrink: 0, overflow: "hidden" }}>
+            {ex.img ? <img src={ex.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-red-light)" }}>{biSideFull(ex.bilateral, s)}</span>
+            <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", lineHeight: 1.3, marginTop: 3 }}>{ex.name}</span>
+          </div>
+          <ExerciseDescriptionView desc={ex.desc} />
+        </div>
+      ))}
+      {ex.rest && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 16px", background: "var(--ff-surface-2)", borderTop: "1px solid var(--ff-border)", borderBottom: "1px solid var(--ff-border)" }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Descanso</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "var(--ff-text-2)" }}>{ex.rest}</span>
+        </div>
+      )}
+      {!isLast && !ex.rest && <div style={{ borderTop: "1px solid var(--ff-border)" }} />}
+    </div>
+  );
+}
+
+// Entrenador: lado en curso relleno en blanco, el anterior con check, la flecha marca el orden.
+function BiSideTrack({ limb, side }) {
+  const pill = (s) => {
+    const cur = s === side;
+    const done = side === "der" && s === "izq";
+    return (
+      <span key={s} style={{ display: "flex", alignItems: "center", gap: 5, height: 26, padding: "0 11px", borderRadius: 999, boxSizing: "border-box", fontFamily: "var(--font-body)", fontSize: 10.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", background: cur ? "#fff" : "transparent", color: cur ? "#0B0B0B" : "rgba(255,255,255,.55)", border: "1px solid " + (cur ? "#fff" : "rgba(255,255,255,.22)") }}>
+        {done ? <R6Icon size={11} stroke="rgba(255,255,255,.7)" w={3}><polyline points="20 6 9 17 4 12" /></R6Icon> : null}
+        {biSideFull(limb, s)}
+      </span>
+    );
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {pill("izq")}
+      <R6Icon size={13} stroke="rgba(255,255,255,.45)" w={2.2}><polyline points="9 18 15 12 9 6" /></R6Icon>
+      {pill("der")}
+    </div>
+  );
+}
+
+function StatusBar() {
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px 4px", pointerEvents: "none" }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff" }}>9:41</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <svg width="16" height="11" viewBox="0 0 16 11" fill="#fff"><rect x="0" y="4" width="3" height="7" rx=".5" /><rect x="4.5" y="2.5" width="3" height="8.5" rx=".5" /><rect x="9" y="1" width="3" height="10" rx=".5" /><rect x="13" y="0" width="3" height="11" rx=".5" /></svg>
+        <svg width="16" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M10.54 16.1a6 6 0 0 1 2.92 0" /><circle cx="12" cy="20" r="1" fill="#fff" /></svg>
+        <svg width="25" height="11" viewBox="0 0 25 11" fill="none"><rect x=".5" y=".5" width="21" height="10" rx="2" stroke="#fff" strokeOpacity=".35" /><rect x="1.5" y="1.5" width="17" height="8" rx="1.5" fill="#fff" /><path d="M23 3.5v4a2 2 0 0 0 0-4z" fill="#fff" opacity=".4" /></svg>
+      </div>
+    </div>
+  );
+}
+
+function GestureBar() {
+  return (
+    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 20, display: "flex", justifyContent: "center", padding: "8px 0 9px", pointerEvents: "none" }}>
+      <div style={{ width: 120, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.25)" }} />
+    </div>
+  );
+}
+
+function PhoneFrame({ children }) {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>
+      <div style={{ position: "relative", width: 390, height: 844, background: "#0a0a0a", borderRadius: 44, boxShadow: "0 0 0 2px #2a2a2a, 0 0 0 7px #111", overflow: "hidden", flexShrink: 0 }}>
+        <StatusBar />
+        <div style={{ position: "absolute", inset: 0, paddingTop: 30, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+            {children}
+          </div>
+        </div>
+        <GestureBar />
+      </div>
+    </div>
+  );
+}
+
+// ── TrainerImmersive.jsx ────────────────────────────────────────
+// Reproductor inmersivo (P2 · aprobado 31 ago 2026): video 16:9 a sangre con fondo
+// ambiental desenfocado, número héroe dentro de un anillo de progreso teñido por el
+// color de la sección, barra de posición en la rutina sobre el transporte y cola por
+// secciones. Convive con TrainerScreen hasta que se retire el entrenador con tabs.
+
+// ── Catálogo del borrador ────────────────────────────────────────
+// Propuesta de superficies claras: el fondo sigue en #0F0F0F y todo lo demás se construye
+// con blanco translúcido encima. Al ser blanco y no gris opaco, cada capa se aclara sin
+// ensuciarse y el rojo de marca sigue siendo el único color fuerte.
+const LIGHT_SURFACES = {
+  "--ff-surface": "rgba(255,255,255,0.07)",
+  "--ff-surface-2": "rgba(255,255,255,0.12)",
+  "--ff-border": "rgba(255,255,255,0.16)",
+  "--ff-text-2": "rgba(255,255,255,0.72)",
+  "--ff-text-3": "rgba(255,255,255,0.45)",
+  "--ff-navbar": "rgba(255,255,255,0.05)",
+};
+
+function fmtClockR6(total) {
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  return h ? `${h}:${mm}:${String(s).padStart(2, "0")}` : `${mm}:${String(s).padStart(2, "0")}`;
+}
+
+function R6Icon({ size = 20, stroke = "var(--ff-text)", w = 2, children }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
+}
+
+function R6CtrlBtn({ primary, dim, onClick, children }) {
+  const size = primary ? 60 : 46;
+  return (
+    <button onClick={onClick} style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0, cursor: "pointer", padding: 0,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: primary ? "var(--ff-red)" : "var(--ff-surface)",
+      border: primary ? "none" : "1px solid var(--ff-border)",
+      opacity: dim ? 0.4 : 1,
+    }}>{children}</button>
+  );
+}
+
+function R6Thumb({ img, size = 44, dim }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "var(--ff-surface-2)" }}>
+      {img ? <div style={{ width: "100%", height: "100%", backgroundImage: `url(${img})`, backgroundSize: "cover", backgroundPosition: "center", filter: dim ? "saturate(.2) brightness(.9)" : "none" }} /> : null}
+    </div>
+  );
+}
+
+function R6QueueGroup({ group, status, open, onToggle, onDragStart, onDragOver, onDrop }) {
+  const { block, rest } = group;
+  const list = r6SectionExercises(block);
+  const single = list.length === 1;
+  const color = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).color;
+  const done = status === "done";
+  const current = status === "current";
+  return (
+    <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
+      style={{ background: "var(--ff-surface)", border: current ? "1.5px solid var(--ff-red)" : "1px solid var(--ff-border)", borderRadius: 14, opacity: done ? 0.55 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px" }}>
+        <R6DragHandle />
+        <R6Check done={done} />
+        <R6Thumb img={single ? list[0].img : (list[0] || {}).img} dim={done} />
+        <div onClick={single ? undefined : onToggle} style={{ flex: 1, minWidth: 0, cursor: single ? "default" : "pointer" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>
+              {current ? "En curso" : done ? "Completada" : "Pendiente"}
+            </span>
+          </div>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 12.5, color: "var(--ff-text)", margin: "3px 0 0", lineHeight: 1.3, letterSpacing: "-.2px", overflowWrap: "anywhere" }}>
+            {single ? list[0].name : block.name}
+          </p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "2px 0 0" }}>
+            {single ? (list[0].meta === r6SectionMeta(block).split(" · ")[1] ? r6SectionMeta(block) : `${r6SectionMeta(block)} · ${list[0].meta}`) : `${r6SectionMeta(block)} · ${list.length} ejercicios`}
+          </p>
+        </div>
+        {single ? <R6SwapBtn /> : (
+          <button onClick={onToggle} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <R6Icon size={15} stroke="var(--ff-text-2)"><polyline points="6 9 12 15 18 9" style={{ transformOrigin: "center", transform: open ? "rotate(180deg)" : "none" }} /></R6Icon>
+          </button>
+        )}
+      </div>
+      {open && !single && (
+        <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--ff-border)" }}>
+          {list.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px 9px 42px", borderTop: i ? "1px solid var(--ff-border)" : "none" }}>
+              <R6Thumb img={it.img} size={34} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{it.name}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "2px 0 0" }}>{it.meta}</p>
+              </div>
+              <R6SwapBtn />
+            </div>
+          ))}
+        </div>
+      )}
+      {rest && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px 10px 42px", borderTop: "1px dashed var(--ff-border)" }}>
+          <R6Icon size={13} stroke="var(--ff-section-rest, #6B7A8D)"><g><circle cx="12" cy="12" r="9" /><polyline points="12 8 12 12 15 14" /></g></R6Icon>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)" }}>Descanso {fmtCountdown(rest.timeSeconds)} · viaja con esta sección</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function R6QueueSheet({ groups, currentIdx, closedIds, onToggleGroup, onClose, onReorder, finish, onFinish }) {
+  const dragFrom = React.useRef(null);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 40, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={finish ? undefined : onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", maxHeight: "78%", display: "flex", flexDirection: "column", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", border: "1px solid var(--ff-border)", borderBottom: "none", overflow: "hidden" }}>
+        {!finish && (
+          <div onClick={onClose} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 0 2px", cursor: "pointer", flexShrink: 0 }}>
+            <span style={{ width: 38, height: 4, borderRadius: 2, background: "var(--ff-border)" }} />
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: finish ? "18px 18px 12px" : "8px 18px 12px", flexShrink: 0 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0, letterSpacing: "-.2px" }}>{finish ? "Rutina completa" : "Cola de la rutina"}</p>
+          {!finish && (
+            <button onClick={onClose} style={{ width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <R6Icon size={16} stroke="var(--ff-text-2)"><polyline points="6 9 12 15 18 9" /></R6Icon>
+            </button>
+          )}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 16px 22px", display: "flex", flexDirection: "column", gap: 8, background: "var(--ff-bg)" }}>
+          {groups.map((g, i) => (
+            <R6QueueGroup key={g.id} group={g} status={finish ? "done" : g.idx < currentIdx ? "done" : g.idx === currentIdx ? "current" : "pending"}
+              open={!closedIds.includes(g.id)} onToggle={() => onToggleGroup(g.id)}
+              onDragStart={() => { dragFrom.current = i; }} onDragOver={(e) => e.preventDefault()}
+              onDrop={() => { const from = dragFrom.current; dragFrom.current = null; if (from == null || from === i) return; const next = groups.slice(); const [m] = next.splice(from, 1); next.splice(i, 0, m); onReorder(next); }} />
+          ))}
+        </div>
+        {finish && (
+          <div style={{ flexShrink: 0, padding: "12px 16px 20px", borderTop: "1px solid var(--ff-border)", background: "var(--ff-surface)" }}>
+            <button style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, cursor: "pointer" }} onClick={onFinish}>Finalizar rutina</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function R6Countdown({ n, name, title = "Prepárate" }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ width: "100%", maxWidth: 240, background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 20, padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{title}</span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 72, lineHeight: 1.1, color: "var(--ff-red)" }}>{n}</span>
+        {name && <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", textAlign: "center" }}>{name}</span>}
+      </div>
+    </div>
+  );
+}
+
+function r6Steps(block) {
+  if (block.type === "rest") return [{ rest: true, seconds: block.timeSeconds, ex: { img: block.img, name: "Descanso" } }];
+  if (block.type === "cycle") {
+    const out = [];
+    for (let s = 1; s <= (block.series || 1); s++) (block.exercises || []).forEach((ex) => biSides(ex).forEach((side) => out.push({ ex, serie: s, side })));
+    return out;
+  }
+  if (block.type === "stripset") {
+    return (block.exercises || []).flatMap((ex) => (ex.sequence || [ex.reps]).flatMap((reps, i) => biSides(ex).map((side) => ({ ex, reps, side, drop: i + 1, drops: (ex.sequence || []).length }))));
+  }
+  if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv, i) => ({ ex: iv, seconds: iv.workSeconds, ivIdx: i }));
+  if (block.exercises) return block.exercises.flatMap((ex) => biSides(ex).map((side) => ({ ex, side })));
+  if (block.exercise) return [{ ex: block.exercise, seconds: block.type === "cardio" ? block.totalTimeSeconds : null, reps: block.repsInitial }];
+  return [];
+}
+
+// Valor héroe histórico (P1–P4): se conserva porque las variantes viejas del borrador lo usan.
+function r6HeroLegacy(block, step) {
+  const ex = step.ex || {};
+  const secs = step.seconds ?? (ex.mode === "time" ? ex.timeSeconds : (!ex.reps && ex.timeSeconds ? ex.timeSeconds : null));
+  if (secs) return { kind: "time", seconds: secs, label: "Tiempo" };
+  const reps = step.reps ?? ex.reps;
+  if (!reps) return { kind: "failure", label: "Hasta no poder más" };
+  return { kind: "reps", value: String(reps), label: "Repeticiones" };
+}
+
+function r6SectionExercises(block) {
+  if (block.type === "cardio" && block.mode === "interval") return (block.intervals || []).map((iv) => ({ name: iv.name, img: iv.img, meta: `${iv.workSeconds}s trabajo · ${iv.restSeconds}s descanso` }));
+  if (block.exercises) return block.exercises.map((ex) => ({ name: ex.name, img: ex.img, meta: (ex.sequence ? ex.sequence.join(" · ") + " reps" : ex.reps ? `${ex.reps} reps` : ex.timeSeconds ? fmtCountdown(ex.timeSeconds) : "Al fallo") + (ex.bilateral ? " por lado" : "") }));
+  if (block.exercise) return [{ name: block.exercise.name, img: block.exercise.img, meta: block.type === "emom" ? `${block.repsInitial} reps al minuto` : fmtCountdown(block.totalTimeSeconds || 0) }];
+  return [];
+}
+
+function r6SectionMeta(block) {
+  const label = (SECTION_TYPES[block.type] || SECTION_TYPES.cycle).label;
+  if (block.type === "cycle") return `${label} · ${block.series} series`;
+  if (block.type === "fortime") return `${label} · ${block.rounds} rondas`;
+  if (block.type === "amrap") return `${label} · ${fmtCountdown(block.totalTimeSeconds)}`;
+  if (block.type === "emom") return `${label} · ${block.minutesTotal} min`;
+  if (block.type === "cardio") return `${label} · ${fmtCountdown(block.totalTimeSeconds || 0)}`;
+  return label;
+}
+
+// Cada sección arrastra su descanso: el grupo es la unidad que se mueve.
+function r6Groups(blocks) {
+  const groups = [];
+  blocks.forEach((b, i) => {
+    if (b.type === "rest") { if (groups.length) groups[groups.length - 1].rest = b; return; }
+    groups.push({ id: b.id, block: b, rest: null, idx: i });
+  });
+  return groups;
+}
+
+// Espejo de getDisplay() del reproductor aprobado: mismo héroe, misma etiqueta, mismo
+// panel y mismo chip de cronómetro por tipo de sección. No inventar variantes aquí.
+function r6ClockBase(block) {
+  if (block.type === "fortime") return { secs: 138, up: true, l: "Tiempo" };
+  if (block.type === "amrap") return { secs: Math.max(0, (block.totalTimeSeconds || 0) - 24), up: false, l: "Restante" };
+  if (block.type === "cardio" && block.mode === "interval") return { secs: Math.max(0, (block.totalTimeSeconds || 0) - 24), up: false, l: "Bloque" };
+  return null;
+}
+
+function r6Display(block, step, idx, total) {
+  const ex = step.ex || {};
+  if (block.type === "rest") return { kind: "time", seconds: block.timeSeconds, label: "Descanso" };
+  if (block.type === "cycle") {
+    const panel = [{ v: step.serie, l: "Serie" }, { v: block.series, l: "Total" }];
+    if (ex.mode === "time" || (!ex.reps && ex.timeSeconds)) return { kind: "time", seconds: ex.timeSeconds, label: "Tiempo", panel };
+    if (ex.mode === "failure" || !ex.reps) return { kind: "failure", label: "Hasta no poder más", panel };
+    return { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel };
+  }
+  if (block.type === "stripset") {
+    return { kind: "reps", value: String(step.reps), label: "Repeticiones", panel: [{ v: step.drop, l: "Serie" }, { v: step.drops, l: "Total" }] };
+  }
+  if (block.type === "fortime") {
+    return { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel: [{ v: 1, l: "Ronda" }, { v: block.rounds, l: "Total" }] };
+  }
+  if (block.type === "amrap") {
+    const isTime = !ex.reps;
+    const panel = [{ v: 0, l: "Rondas" }, { v: `${idx + 1}/${total}`, l: "Ejercicio" }];
+    return isTime
+      ? { kind: "time", seconds: ex.timeSeconds, label: "Tiempo", panel }
+      : { kind: "reps", value: String(ex.reps), label: "Repeticiones", panel };
+  }
+  if (block.type === "emom") {
+    const reps = (block.repsInitial || 0);
+    return { kind: "time", seconds: 60, label: "Tiempo", panel: [{ v: reps, l: "Repeticiones" }, { v: 0, l: "Min. completados" }] };
+  }
+  if (block.type === "cardio") {
+    if (block.mode === "traditional") return { kind: "time", seconds: block.totalTimeSeconds, label: "Tiempo restante" };
+    if (ex.reps) return { kind: "reps", value: String(ex.reps), label: "Repeticiones" };
+    return { kind: "time", seconds: ex.workSeconds || step.seconds, label: "Tiempo" };
+  }
+  return { kind: "reps", value: String(ex.reps || 0), label: "Repeticiones" };
+}
+
+// ── P2 · Reproductor inmersivo ───────────────────────────────────
+// Tres cambios frente al rediseño actual: el video pasa a sangre completa y deja de ser
+// una franja; el número héroe vive dentro de un anillo que se vacía (o se llena por serie),
+// así siempre hay algo en movimiento; y el color de la sección tiñe anillo y número, de
+// modo que un Cycle no se ve igual que un AMRAP. Todo lo demás flota en blanco translúcido.
+const R7_SHEET = {
+  "--ff-bg": "#0F0F0F", "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222",
+  "--ff-border": "#2A2A2A", "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+
+// El anillo se rige por la naturaleza de la sección, no por el paso:
+// cycle / stripset / for time van por series (arcos que se llenan, aunque el
+// ejercicio sea de tiempo); amrap, emom, cardio y descanso van por tiempo en
+// decremento (el anillo se completa conforme baja). EMOM reinicia cada minuto.
+function r7RingSpec(block, step, steps, sIdx, remaining, clockSecs) {
+  const t = block.type;
+  if (t === "cycle") return { mode: "seg", seg: { n: block.series || 1, i: step.serie || 1 } };
+  if (t === "stripset") return { mode: "seg", seg: { n: step.drops || 1, i: step.drop || 1 } };
+  if (t === "fortime") return { mode: "seg", seg: { n: block.rounds || 1, i: step.round || 1 } };
+
+  const byTime = (total, left) => {
+    if (!total) return { mode: "none" };
+    return { mode: "time", progress: Math.min(1, Math.max(0, 1 - left / total)) };
+  };
+  if (t === "rest") return byTime(block.timeSeconds, remaining);
+  if (t === "emom") return byTime(60, remaining);
+  if (t === "amrap") return byTime(block.totalTimeSeconds, clockSecs);
+  if (t === "cardio") return byTime(block.totalTimeSeconds, block.mode === "traditional" ? remaining : clockSecs);
+  return { mode: "seg", seg: { n: steps.length || 1, i: sIdx + 1 } };
+}
+
+// Un solo anillo con dos modos: si el paso tiene tiempo se vacía; si es por repeticiones
+// se parte en tantos arcos como series y se van llenando. En ambos casos significa avance.
+function R7Ring({ size = 236, stroke = 5, color, mode, progress = 0, seg, children }) {
+  const r = (size - stroke) / 2;
+  const C = 2 * Math.PI * r;
+  const gap = 7;
+  const arcs = [];
+  if (mode === "time") {
+    arcs.push({ len: Math.max(0, C * progress), off: 0, on: true });
+  } else if (mode === "seg") {
+    const each = C / seg.n;
+    for (let i = 0; i < seg.n; i++) arcs.push({ len: Math.max(2, each - gap), off: -i * each, on: i < seg.i, cur: i === seg.i - 1 });
+  }
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={stroke} />
+        {arcs.map((a, i) => (
+          <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" strokeLinecap="round"
+            stroke={a.on ? color : "transparent"} strokeWidth={stroke} opacity={a.cur ? 0.5 : 1}
+            strokeDasharray={`${a.len} ${C - a.len}`} strokeDashoffset={a.off}
+            style={{ transition: mode === "time" ? "stroke-dasharray .95s linear" : "none" }} />
+        ))}
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>{children}</div>
+    </div>
+  );
+}
+
+function PlainHero({ children }) {
+  return <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>{children}</div>;
+}
+
+function R7Stat({ value, label }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px" }}>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "#fff", lineHeight: 1 }}>{value}</span>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginTop: 4 }}>{label}</span>
+    </div>
+  );
+}
+
+function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish, weight = null, weightOpen = false, restState = "info", preWeights = false, restSerie = null }) {
+  const [pre, setPre] = React.useState(preWeights);
+  const [wSheet, setWSheet] = React.useState(weightOpen);
+  const [kg, setKg] = React.useState(restState === "first" ? null : 22.5);
+  const wGate = React.useRef(false);
+  const blocks = blocksOverride || window.FF_DATA.trainerBlocks || [];
+  // EMOM: un solo ejercicio que se repite cada minuto. No hay pasos que saltar, así que
+  // atrás/siguiente se retiran y en su lugar queda una acción explícita de finalizar sección.
+  const isEmom = (blocks[blockIdx] || {}).type === "emom";
+  const [intro, setIntro] = React.useState(() => emomIntro || (live && isEmom));
+  const [bIdx] = React.useState(blockIdx);
+  const [sIdx, setSIdx] = React.useState(stepIdx);
+  const [isPaused, setPaused] = React.useState(paused);
+  const [queue, setQueue] = React.useState(queueOpen || finishOpen);
+  const [finished, setFinished] = React.useState(finishOpen);
+  const [closedGroups, setClosedGroups] = React.useState([]);
+  const [groups, setGroups] = React.useState(() => r6Groups(blocks));
+  const [elapsed, setElapsed] = React.useState(724);
+  const [preroll, setPreroll] = React.useState(showPreroll ? 3 : null);
+  const [clockSecs, setClockSecs] = React.useState(() => { const c = r6ClockBase(blocks[blockIdx] || {}); return c ? c.secs : 0; });
+  const touchY = React.useRef(null);
+
+  const block = blocks[bIdx] || blocks[0];
+  const steps = r6Steps(block);
+  const step = steps[Math.min(sIdx, steps.length - 1)] || {};
+  const hero = r6Display(block, step, sIdx, steps.length);
+  // Los frames estáticos por tiempo arrancan a mitad de cuenta para que el anillo se vea avanzado.
+  const seedRemaining = (h) => {
+    const s = h.seconds || 0;
+    if (live || !s) return s;
+    return ["rest", "emom", "cardio"].indexOf(block.type) < 0 ? s : Math.round(s * 0.38);
+  };
+  const [remaining, setRemaining] = React.useState(() => seedRemaining(hero));
+  const clockBase = block.type === "rest" ? null : r6ClockBase(block);
+  const isLastStep = !blocks[bIdx + 1] && sIdx >= steps.length - 1;
+  const finishNow = () => { setFinished(true); setQueue(true); };
+
+  React.useEffect(() => { setRemaining(seedRemaining(hero)); }, [sIdx]);
+  React.useEffect(() => {
+    if (!live || isPaused || !clockBase) return;
+    const t = setInterval(() => setClockSecs((s) => clockBase.up ? s + 1 : (s > 1 ? s - 1 : clockBase.secs)), 1000);
+    return () => clearInterval(t);
+  }, [isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused) return;
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused || preroll === null || showPreroll) return;
+    const t = setTimeout(() => setPreroll((n) => (n > 1 ? n - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [preroll, isPaused]);
+  React.useEffect(() => {
+    if (!live || isPaused || preroll !== null || hero.kind !== "time") return;
+    const t = setInterval(() => setRemaining((r) => {
+      if (r > 1) return r - 1;
+      if (isLastStep) { finishNow(); return 0; }
+      return hero.seconds || 0;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [isPaused, preroll, sIdx]);
+
+  const wPrev = block.type === "rest" ? wPrevOf(blocks, bIdx) : null;
+  const wEx = wPrev ? wPrev.ex : step.ex;
+  const wCan = !!weight && isLoaded(wEx);
+  const wSerie = restSerie || (wPrev ? wPrev.serie : null) || ( block.type === "stripset" ? [step.drop, step.drops] : block.type === "cycle" ? [step.serie, block.series] : null);
+  const wCompact = weight === "rest" && wCan && block.type === "rest";
+  // En el descanso con registro, el anillo se retira: cronómetro como número grande.
+  const HeroWrap = wCompact ? PlainHero : R7Ring;
+  const goStep = (d) => {
+    if (d > 0 && weight === "sheet" && wCan && !wGate.current) { setWSheet(true); return; }
+    wGate.current = false;
+    if (d > 0 && isLastStep) { finishNow(); return; }
+    const n = sIdx + d;
+    if (n < 0 || n >= steps.length) return;
+    setSIdx(n);
+    if (live && d > 0 && steps[n].side === "der" && steps[n].ex === step.ex) setPreroll(3);
+  };
+
+  const sec = SECTION_TYPES[block.type] || SECTION_TYPES.cycle;
+  const color = block.type === "rest" ? "#6B7A8D" : sec.color;
+  const heroValue = hero.kind === "time" ? fmtCountdown(remaining) : hero.kind === "reps" ? hero.value : "Al fallo";
+  const ringSpec = r7RingSpec(block, step, steps, sIdx, remaining, clockSecs);
+  const curImg = (step.ex || {}).img || block.img;
+  const curName = block.type === "rest" ? "Descanso" : (step.ex || {}).name;
+  const muscles = block.type === "rest" ? [] : ((step.ex || {}).muscles || []);
+  const panel = hero.panel || null;
+  const curGroupIdx = groups.findIndex((g) => g.idx === (block.type === "rest" ? bIdx - 1 : bIdx));
+  const dimmed = isPaused || block.type === "rest";
+
+  const nextUp = (() => {
+    if (isLastStep) return { title: "Finalizar entrenamiento", sub: "Verás el resumen de tu rutina", finish: true };
+    if (sIdx + 1 < steps.length) {
+      const ns = steps[sIdx + 1];
+      const nh = r6HeroLegacy(block, ns);
+      // Cambio de lado: mismo ejercicio, sin descanso de por medio.
+      if (ns.side && ns.ex === step.ex) return { title: `Cambia a ${biSideFull(ns.ex.bilateral, ns.side).toLowerCase()}`, img: ns.ex.img };
+      if (block.restBetweenSeconds) return { title: `Descanso ${fmtCountdown(block.restBetweenSeconds)}`, sub: `Luego: ${ns.ex.name}`, img: ns.ex.img, rest: true };
+      return { title: ns.ex.name, sub: nh.kind === "time" ? fmtCountdown(nh.seconds) : nh.kind === "reps" ? `${nh.value} reps` : "Al fallo", img: ns.ex.img };
+    }
+    const nb = blocks[bIdx + 1];
+    if (!nb) return { title: "Última sección", sub: "Al terminar verás tu resumen" };
+    if (nb.type === "rest") return { title: `Descanso ${fmtCountdown(nb.timeSeconds)}`, sub: "Entre secciones", img: nb.img, rest: true };
+    const list = r6SectionExercises(nb);
+    return { title: nb.name, sub: `${r6SectionMeta(nb)} · ${list.length} ejercicio${list.length > 1 ? "s" : ""}`, img: (list[0] || {}).img };
+  })();
+
+  return (
+    <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "#0B0B0B", ...LIGHT_SURFACES }} data-screen-label="Reproductor inmersivo">
+      {/* Los videos son 16:9: no se recortan. El plate respeta su proporción a todo el ancho
+          y el mismo frame, escalado y desenfocado, llena el resto como fondo ambiental. */}
+      <div style={{ position: "absolute", inset: -40, backgroundImage: `url(${curImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: `blur(44px) saturate(${dimmed ? 0.15 : 0.7}) brightness(${dimmed ? 0.3 : 0.42})`, transform: "scale(1.15)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 262, backgroundImage: `url(${curImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: dimmed ? "saturate(.25) brightness(.5)" : "none", WebkitMaskImage: "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)", maskImage: "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(11,11,11,.72) 0%, rgba(11,11,11,.08) 18%, rgba(11,11,11,.22) 38%, rgba(11,11,11,.66) 58%, rgba(11,11,11,.92) 78%, #0B0B0B 100%)" }} />
+
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 18px 22px" }}>
+        {/* El video queda limpio: encima solo vive el cierre */}
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 30, flexShrink: 0 }}>
+          <button title="Salir del entrenador" onClick={onExit} style={{ width: 44, height: 44, marginRight: -10, borderRadius: "50%", background: "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <R6Icon size={18} stroke="#fff" w={2.2}><g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g></R6Icon>
+          </button>
+        </div>
+
+        {/* Héroe dentro del anillo */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: wCompact ? 14 : 18, paddingTop: wCompact ? 24 : 54 }}>
+          <HeroWrap size={236} color={color} mode={ringSpec.mode} progress={ringSpec.progress} seg={ringSpec.seg}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: wCompact ? 52 : hero.kind === "failure" ? 30 : hero.kind === "time" ? 48 : 62, lineHeight: 1, color: "#fff", letterSpacing: "-1px" }}>{heroValue}</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase", color: color, marginTop: 6 }}>
+              {hero.kind === "failure" ? "Hasta no poder más" : hero.label}
+            </span>
+            {hero.kind === "reps" && block.type !== "rest" && (step.ex || {}).rir != null && (
+              <span style={{ marginTop: 10, fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff", background: "var(--ff-red)", borderRadius: 4, padding: "3px 8px", whiteSpace: "nowrap" }}>{step.ex.rir === 0 ? "Al fallo" : "RIR " + step.ex.rir}</span>
+            )}
+            {clockBase && (
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "rgba(255,255,255,.55)", marginTop: 8 }}>{clockBase.l} {fmtCountdown(clockSecs)}</span>
+            )}
+          </HeroWrap>
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}>
+            {wCompact ? null : <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: 0, lineHeight: 1.35, textAlign: "center", letterSpacing: "-.3px", textWrap: "pretty" }}>{curName}</p>}
+            {step.side && block.type !== "rest" && <BiSideTrack limb={(step.ex || {}).bilateral} side={step.side} />}
+            {muscles.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
+                {muscles.map((m) => (
+                  <span key={m} style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 500, letterSpacing: ".06em", textTransform: "uppercase", color: "rgba(255,255,255,.62)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 999, padding: "3px 9px", lineHeight: 1.4 }}>{m}</span>
+                ))}
+              </div>
+            )}
+            {weight === "rest" && wCan ? <WeightRestCard ex={wEx} serie={wSerie} kg={kg} setKg={setKg} initial={restState} feel={restState === "edit" ? "Moderada" : null} /> : null}
+            {panel && (
+              <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
+                <R7Stat value={panel[0].v} label={panel[0].l} />
+                <div style={{ width: 1, height: 26, background: "rgba(255,255,255,.18)" }} />
+                <R7Stat value={panel[1].v} label={panel[1].l} />
+                {weight === "panel" && wCan ? <div style={{ width: 1, height: 26, background: "rgba(255,255,255,.18)" }} /> : null}
+                {weight === "panel" && wCan ? (
+                  <button onClick={() => setWSheet(true)} title="Registrar peso" style={{ background: "transparent", border: "none", padding: "6px 0", cursor: "pointer" }}>
+                    <R7Stat value={<span style={{ borderBottom: "1px dashed rgba(255,255,255,.5)", paddingBottom: 1 }}>{fmtKg(kg)}</span>} label="Peso · kg" />
+                  </button>
+                ) : null}
+              </div>
+            )}
+            {isEmom && (
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 11.5, lineHeight: 1.45, color: "rgba(255,255,255,.62)", textAlign: "center", margin: "4px 0 0", maxWidth: 268, textWrap: "pretty" }}>Cuando ya no completes las reps dentro del minuto, finaliza la sección.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Dónde vas en la rutina, pegado a los controles que te mueven por ella */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 18, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.72)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {block.type === "rest" ? "Descanso" : sec.label} · {Math.min(curGroupIdx + 1, groups.length)} de {groups.length}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <R6Icon size={12} stroke="rgba(255,255,255,.5)"><g><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></g></R6Icon>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,.75)" }}>{fmtClockR6(elapsed)}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 3 }}>
+            {groups.map((g, i) => (
+              <span key={g.id} style={{ flex: 1, height: 3, borderRadius: 2, background: i < curGroupIdx ? "rgba(255,255,255,.85)" : i === curGroupIdx ? color : "rgba(255,255,255,.18)" }} />
+            ))}
+          </div>
+        </div>
+
+        {isEmom ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 16, flexShrink: 0 }}>
+            <R6CtrlBtn>
+              <R6Icon size={17} stroke="#fff"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></g></R6Icon>
+            </R6CtrlBtn>
+            <R6CtrlBtn primary onClick={() => setPaused((p) => !p)}>
+              {isPaused ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="7 4 20 12 7 20" /></svg>
+                : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>}
+            </R6CtrlBtn>
+            <button onClick={finishNow} title="Finalizar sección" style={{ width: 46, height: 46, borderRadius: "50%", background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <R6Icon size={17} stroke="var(--ff-red)" w={2.4}><polyline points="20 6 9 17 4 12" /></R6Icon>
+            </button>
+          </div>
+        ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", marginBottom: 16, flexShrink: 0 }}>
+          <R6CtrlBtn dim={sIdx === 0} onClick={() => goStep(-1)}>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></g></R6Icon>
+          </R6CtrlBtn>
+          <R6CtrlBtn primary onClick={() => setPaused((p) => !p)}>
+            {isPaused ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="7 4 20 12 7 20" /></svg>
+              : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>}
+          </R6CtrlBtn>
+          <R6CtrlBtn onClick={() => goStep(1)}>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></g></R6Icon>
+          </R6CtrlBtn>
+          <R6CtrlBtn>
+            <R6Icon size={17} stroke="#fff"><g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></g></R6Icon>
+          </R6CtrlBtn>
+        </div>
+        )}
+
+        {/* A continuación · más delgado, ya no compite con el anillo */}
+        <button onClick={() => (isLastStep ? finishNow() : setQueue(true))}
+          onTouchStart={(e) => { touchY.current = e.touches[0].clientY; }}
+          onTouchEnd={(e) => { if (touchY.current !== null && touchY.current - e.changedTouches[0].clientY > 24) (isLastStep ? finishNow() : setQueue(true)); touchY.current = null; }}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 14, padding: "8px 10px", cursor: "pointer", flexShrink: 0 }}>
+          {nextUp.img ? <R6Thumb img={nextUp.img} size={34} dim={nextUp.rest} /> : (
+            <span style={{ width: 34, height: 34, borderRadius: 9, background: nextUp.finish ? "var(--ff-red)" : "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <R6Icon size={15} stroke="#fff"><polyline points="20 6 9 17 4 12" /></R6Icon>
+            </span>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontFamily: "var(--font-body)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.5)" }}>{nextUp.finish ? "Al terminar" : "A continuación"}</span>
+            <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 12, color: "#fff", margin: "2px 0 0", letterSpacing: "-.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nextUp.title}</span>
+          </div>
+          <span style={{ display: "flex", alignItems: "center", flexShrink: 0, paddingRight: 2 }}>
+            <R6Icon size={17} stroke="rgba(255,255,255,.6)"><polyline points="18 15 12 9 6 15" /></R6Icon>
+          </span>
+        </button>
+      </div>
+
+      {queue && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 40, ...R7_SHEET }}>
+          <R6QueueSheet groups={groups} currentIdx={block.type === "rest" ? bIdx - 1 : bIdx} closedIds={finished ? [] : closedGroups}
+            onToggleGroup={(id) => setClosedGroups((c) => c.includes(id) ? c.filter((x) => x !== id) : [...c, id])}
+            onClose={() => { setQueue(false); setFinished(false); }} onReorder={setGroups} finish={finished} onFinish={onFinish} />
+        </div>
+      )}
+      {wSheet && wCan ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 45, ...R7_SHEET }}>
+          <WeightSheet ex={wEx} serie={wSerie} kg={kg} setKg={setKg} skip={weight === "sheet"}
+            cta={weight === "sheet" ? "Guardar y continuar" : "Guardar"}
+            onClose={() => setWSheet(false)}
+            onSkip={() => { setWSheet(false); wGate.current = true; goStep(1); }}
+            onSave={() => { setWSheet(false); if (weight === "sheet") { wGate.current = true; goStep(1); } }} />
+        </div>
+      ) : null}
+      {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={step.side ? `${biSideFull((step.ex || {}).bilateral, step.side)} · ${curName}` : curName} title={step.side === "der" ? "Cambia de lado" : "Prepárate"} /></div>}
+      {pre ? <PreSectionWeights block={block} color={color} isLastSection={forceLast || !blocks[bIdx + 1]} onStart={() => { setPre(false); setIntro(false); }} onSkip={() => { setPre(false); setIntro(false); }} /> : null}
+      {intro && !pre && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 22, background: "rgba(0,0,0,.72)", ...R7_SHEET }}>
+          <div style={{ width: "100%", background: "#1A1A1A", border: "1px solid #2A2A2A", borderRadius: 16, padding: "20px 18px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: color }}>EMOM · {block.minutesTotal} min</span>
+            </div>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "#fff", margin: "0 0 10px", letterSpacing: "-.3px", lineHeight: 1.35 }}>Cómo funciona esta sección</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13.5, color: "rgba(255,255,255,.75)", lineHeight: 1.6, margin: "0 0 14px", textWrap: "pretty" }}>
+              Cada minuto en punto haces las repeticiones indicadas; el tiempo que te sobre dentro del minuto es tu descanso.
+            </p>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "11px 12px", marginBottom: 16 }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <R6Icon size={13} stroke="var(--ff-red)" w={2.4}><polyline points="20 6 9 17 4 12" /></R6Icon>
+              </span>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,.75)", lineHeight: 1.55, margin: 0, textWrap: "pretty" }}>
+                {!forceLast && blocks[bIdx + 1]
+                  ? "Cuando ya no completes las reps del minuto, toca este botón: cierras esta sección y pasas a la siguiente. Tu rutina continúa."
+                  : "Cuando ya no completes las reps del minuto, toca este botón: es la última sección, tu rutina finalizaría."}
+              </p>
+            </div>
+            <button onClick={() => setIntro(false)} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px", cursor: "pointer" }}>Comenzar sección</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function R6DragHandle() {
+  return (
+    <span style={{ display: "flex", flexShrink: 0, cursor: "grab", color: "var(--ff-text-3)" }} title="Arrastra para reordenar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4" /><circle cx="15" cy="6" r="1.4" /><circle cx="9" cy="12" r="1.4" /><circle cx="15" cy="12" r="1.4" /><circle cx="9" cy="18" r="1.4" /><circle cx="15" cy="18" r="1.4" /></svg>
+    </span>
+  );
+}
+
+function R6Check({ done }) {
+  return done ? (
+    <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--ff-red)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <R6Icon size={12} stroke="#fff" w={3}><polyline points="20 6 9 17 4 12" /></R6Icon>
+    </span>
+  ) : (
+    <span style={{ width: 20, height: 20, borderRadius: "50%", border: "1.5px solid var(--ff-border)", flexShrink: 0 }} />
+  );
+}
+
+function R6SwapBtn({ onClick }) {
+  return (
+    <button onClick={onClick} title="Cambiar ejercicio" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", cursor: "pointer", flexShrink: 0 }}>
+      <R6Icon size={15} stroke="var(--ff-text-2)"><g><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></g></R6Icon>
+    </button>
+  );
+}
+
+(function () {
+const { Button, Badge } = window.FitFightersDesignSystem_4614fc;
+const HEX = { cycle: "#FF3200", stripset: "#FF9A3C", fortime: "#2ECF7A", amrap: "#4DA6FF", cardio: "#4DA6FF", emom: "#C77DFF", rest: "#6B7A8D" };
+const fmt = (s) => { s = Math.max(0, Math.round(s)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+function targetText(d) {
+  if (!d) return "";
+  if (d.kind === "repeats") return !d.reps ? "Al fallo" : d.reps + " reps" + (d.rir != null ? " · RIR " + d.rir : "");
+  if (d.kind === "time") return d.unit === "seg" ? d.time + " seg" : d.time + " " + (d.unit || "");
+  if (d.kind === "stripset") return d.reps.join(" · ") + " reps" + (d.rir != null ? " · RIR " + d.rir : "");
+  if (d.kind === "emom") return "Empieza en " + d.initial + " reps, +" + d.increment + " cada minuto";
+  return "";
+}
+function buildRoutine() {
+  const src = (window.FF_DATA && window.FF_DATA.routineDetailBlocks) || [];
+  let cyc = 0, single = 0;
+  const blocks = [];
+  src.forEach((b, bi) => {
+    const id = "b" + bi;
+    if (b.type === "rest") { blocks.push({ id, type: "rest", secs: b.timeSeconds }); return; }
+    const exs = b.exercises || [];
+    let name = b.name, n = 0;
+    if (b.type === "cycle") { cyc += 1; name = "Ciclo " + cyc + (b.home ? " · En casa" : ""); n = b.series; }
+    else if (b.type === "stripset") n = b.series;
+    else if (b.type === "fortime") n = b.rounds;
+    else if (b.type === "emom") n = 7;
+    else if (b.type === "cardio") n = 1;
+    const rows = exs.map((e) => ({ ex: e, target: targetText(e.desc) }));
+    if (b.type === "cycle" && exs.length === 1) { single += 1; cyc -= 1; name = "Ejercicio " + single; }
+    blocks.push({ id, type: b.type, name, rows, n, src: b, dkey: id + "-d" });
+  });
+  return blocks;
+}
+function simpleStats(b) {
+  const s = b.src, rest = s.restBetweenSeriesSeconds ? s.restBetweenSeriesSeconds + " s" : "—";
+  const R = { label: "Descanso entre ejercicios", value: rest };
+  if (b.type === "cycle" || b.type === "stripset") return [{ label: "Series", value: s.series }, R];
+  if (b.type === "fortime") return [{ label: "Rondas", value: s.rounds }, R];
+  if (b.type === "emom") return [{ label: "Minutos", value: b.n }, R];
+  return [{ label: "Duración", value: fmt(s.totalTimeSeconds) }, R];
+}
+const ICheck = ({ color = "#0F0F0F", size = 18, w = 3 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+);
+const IInfo = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+);
+function ExRowHead({ row, onOpen, onSwap, done }) {
+  const iconBtn = (label, onClick, icon) => (
+    <button onClick={onClick} aria-label={label} title={label} style={{ width: 36, height: 44, flexShrink: 0, border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ff-text-3)" }}>{icon}</button>
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, lineHeight: 1.3, color: done ? "var(--ff-text-3)" : "var(--ff-text)", textWrap: "pretty" }}>{row.ex.name}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44 }}>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 14, color: done ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums" }}>{row.target}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: -10 }}>
+          {iconBtn("Ver instrucciones", onOpen, <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>)}
+          {onSwap ? iconBtn("Cambiar ejercicio", onSwap, <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+function ExName({ row, onOpen, done }) {
+  return (
+    <button onClick={onOpen} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", color: done ? "var(--ff-text-3)" : "var(--ff-text)", minWidth: 0 }}>
+      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 500, lineHeight: 1.3, textWrap: "pretty" }}>{row.ex.name}</span>
+      </span>
+      <span style={{ color: "var(--ff-text-3)" }}><IInfo /></span>
+    </button>
+  );
+}
+function ProRing({ d, n, color }) {
+  const s = 46, sw = 3.5, rr = (s - sw) / 2, C = 2 * Math.PI * rr;
+  return (
+    <div style={{ position: "relative", width: s, height: s, flexShrink: 0 }}>
+      <svg width={s} height={s} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={s / 2} cy={s / 2} r={rr} fill="none" stroke="var(--ff-border)" strokeWidth={sw} />
+        <circle cx={s / 2} cy={s / 2} r={rr} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeDasharray={`${(C * d) / n} ${C}`} />
+      </svg>
+      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, color: "var(--ff-text)", fontVariantNumeric: "tabular-nums" }}>{d}/{n}</span>
+    </div>
+  );
+}
+// Tabla por ejercicio: reps obligatorias para marcar la serie; el peso llega como sugerencia
+// (serie anterior o última sesión) y solo se escribe si cambió.
+function SeriesTable({ r, n, list, setList, unit, setUnit, color }) {
+  const loaded = isLoadedRow(r), target = repsOf(r);
+  const cell = { height: 44, width: "100%", minWidth: 0, boxSizing: "border-box", borderRadius: 10, border: "1px solid var(--ff-border)", background: "var(--ff-surface-2)", outline: "none", textAlign: "center", padding: 0, fontFamily: "var(--font-body)", fontSize: 16, fontWeight: 600, color: "var(--ff-text)", fontVariantNumeric: "tabular-nums" };
+  const head = { fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)" };
+  const grid = { display: "grid", gridTemplateColumns: "36px minmax(0, 1fr) minmax(0, 1fr) 44px", gap: 8, alignItems: "center" };
+  const upd = (i, patch) => setList(list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const kgHint = (i) => { for (let j = i - 1; j >= 0; j--) if (list[j].kg !== "") return list[j].kg; const l = LAST_KG[r.ex.name]; return l != null ? String(l) : ""; };
+  const last = LAST_KG[r.ex.name];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 4 }}>
+      <div style={grid}>
+        <span style={head}>Serie</span>
+        <span style={{ ...head, display: "flex", alignItems: "center", gap: 6 }}>Peso{loaded ? <UnitToggle unit={unit} setUnit={setUnit} /> : null}</span>
+        <span style={head}>Reps</span>
+        <span style={{ ...head, textAlign: "center" }}>Hecha</span>
+      </div>
+      {list.map((x, i) => {
+        const can = x.reps !== "", hint = kgHint(i);
+        return (
+          <div key={i} style={grid}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 700, color: "var(--ff-text)", textAlign: "center" }}>{i + 1}</span>
+            {loaded ? <input value={x.kg} placeholder={hint || "—"} inputMode="decimal" aria-label={"Peso serie " + (i + 1)} onChange={(e) => upd(i, { kg: e.target.value.replace(",", ".").replace(/[^0-9.]/g, "") })} style={cell} />
+              : <span style={{ ...cell, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: "var(--ff-text-3)" }}>—</span>}
+            <input value={x.reps} placeholder={target ? String(target) : "—"} inputMode="numeric" aria-label={"Reps serie " + (i + 1)} onChange={(e) => upd(i, { reps: e.target.value.replace(/\D/g, "").slice(0, 3) })} style={cell} />
+            <button onClick={() => can && upd(i, { done: !x.done, kg: x.kg === "" && loaded ? hint : x.kg })} aria-label={"Completar serie " + (i + 1)} style={{ width: 44, height: 44, border: "none", background: "transparent", padding: 0, cursor: can ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", boxSizing: "border-box", border: x.done ? "none" : "2px solid " + (can ? "var(--ff-text-2)" : "var(--ff-border)"), background: x.done ? "var(--ff-red)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>{x.done ? <ICheck size={15} /> : null}</span>
+            </button>
+          </div>
+        );
+      })}
+      {last != null ? (
+        <p style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "4px 0 0", fontVariantNumeric: "tabular-nums" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
+          Última sesión: {fmtKg(last)} kg · {target ? Array.from({ length: n }, (_, i) => Math.max(1, target - (i > 0 ? 1 : 0) - (i > 2 ? 1 : 0))).join(" / ") : "—"} reps
+        </p>
+      ) : null}
+      <Caution />
+    </div>
+  );
+}
+function ProSectionCard2({ b, color, on, rec, setRec, open, swap, onComplete }) {
+  const R = { rows: {}, open: {}, unit: {}, feel: null, ...(rec || {}) };
+  const n = b.n, logs = b.rows.filter(logRow);
+  const listOf = (r) => R.rows[r.ex.name] || Array.from({ length: n }, () => ({ kg: "", reps: "", done: false }));
+  const doneSeries = logs.length ? Math.min(...logs.map((r) => listOf(r).filter((x) => x.done).length)) : 0;
+  const allDone = doneSeries >= n;
+  const put = (fn) => setRec((p) => fn({ rows: {}, open: {}, unit: {}, feel: null, ...p }));
+  return (
+    <div style={{ background: "var(--ff-surface)", border: `1px solid ${on ? tint(color, 0.45) : "var(--ff-border)"}`, borderRadius: 16, padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 15, color: on ? "var(--ff-text-3)" : "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>{b.name}</p>
+        {on ? <span style={{ width: 32, height: 32, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center" }}><ICheck size={18} /></span> : null}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8, marginTop: 6 }}>
+        {simpleStats(b).map((st) => (
+          <div key={st.label} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{st.label}</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600, color: on ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{st.value}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 14 }}>
+        {b.rows.map((r, ri) => {
+          const isOpen = !!R.open[r.ex.name], list = listOf(r), cnt = list.filter((x) => x.done).length, full = cnt >= n;
+          const tone = full ? "var(--ff-red)" : isOpen ? "var(--ff-text)" : "var(--ff-red)";
+          return (
+            <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 0 4px", borderTop: "1px solid var(--ff-border)" }}>
+              <ExRowHead row={r} onOpen={() => open(b, r)} onSwap={swap ? () => swap(b, r) : null} done={on} />
+              {logRow(r) ? (
+                <>
+                  <button onClick={() => put((p) => ({ ...p, open: { ...p.open, [r.ex.name]: !isOpen } }))} style={{ width: "100%", height: 44, display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", padding: 0, cursor: "pointer" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {full ? <ICheck color="var(--ff-red)" size={16} /> : null}
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: tone }}>{full ? "Series registradas" : isOpen ? "Registro de series" : "Registrar series"}</span>
+                    </span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={tone} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .25s ease" }}><polyline points="6 9 12 15 18 9" /></svg>
+                  </button>
+                  {isOpen ? <SeriesTable r={r} n={n} list={list} color={color} unit={R.unit[r.ex.name] || "kg"}
+                    setUnit={(u) => put((p) => ({ ...p, unit: { ...p.unit, [r.ex.name]: u } }))}
+                    setList={(l) => put((p) => ({ ...p, rows: { ...p.rows, [r.ex.name]: l } }))} /> : null}
+                </>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {allDone ? (
+        <div style={{ paddingTop: 14, borderTop: "1px solid var(--ff-border)" }}>
+          {on ? (
+            <p style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#2ECF7A", margin: 0 }}><ICheck color="#2ECF7A" size={15} />Sección completada · {R.feel}</p>
+          ) : <LFeelPicker value={R.feel} onChange={(f) => { put((p) => ({ ...p, feel: f })); onComplete(); }} />}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+function ProSectionCard({ b, color, on, log, open, onFinish }) {
+  const done = log ? log.done : 0, n = b.n, entries = log ? log.entries : [];
+  return (
+    <div style={{ background: "var(--ff-surface)", border: `1px solid ${on ? tint(color, 0.45) : "var(--ff-border)"}`, borderRadius: 16, padding: "14px 16px 14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 32 }}>
+        <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 15, color: on ? "var(--ff-text-3)" : "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>{b.name}</p>
+        {on ? <span style={{ width: 32, height: 32, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center" }}><ICheck size={18} /></span> : null}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8, marginTop: 12 }}>
+        {simpleStats(b).map((st) => (
+          <div key={st.label} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{st.label}</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600, color: on ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{st.value}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 14 }}>
+        {b.rows.map((r, ri) => (
+          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderTop: "1px solid var(--ff-border)" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}><ExName row={r} onOpen={() => open(b, r)} done={on} /></div>
+              <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.target}</span>
+            </div>
+            {entries.length && logRow(r) ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
+                {entries.map((e, i) => { const x = e[r.ex.name]; if (!x) return null; return (
+                  <span key={i} style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    <span style={{ color: "var(--ff-text-3)" }}>S{i + 1}</span> {x.kg != null && isLoadedRow(r) ? fmtKg(x.kg) + " " + x.unit + " × " : ""}{x.reps}{x.kg != null && isLoadedRow(r) ? "" : " reps"}
+                  </span>
+                ); })}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, borderTop: "1px solid var(--ff-border)" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {Array.from({ length: n }).map((_, i) => (
+            <span key={i} style={{ width: 26, height: 26, borderRadius: "50%", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center",
+              background: i < done ? color : "transparent", border: i < done ? "none" : i === done ? "2px solid " + color : "1px solid var(--ff-border)",
+              fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 700, color: i === done ? "var(--ff-text)" : "var(--ff-text-3)" }}>
+              {i < done ? <ICheck size={13} /> : i + 1}
+            </span>
+          ))}
+        </div>
+        <div style={{ flex: 1 }} />
+        {done < n ? (
+          <button onClick={onFinish} style={{ height: 44, padding: "0 16px", borderRadius: 10, border: "none", background: "var(--ff-red)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 11.5, letterSpacing: "-.2px", cursor: "pointer", flexShrink: 0 }}>Terminé la serie {done + 1}</button>
+        ) : (
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#2ECF7A" }}>Sección completada</span>
+        )}
+      </div>
+    </div>
+  );
+}
+function TimedProCard({ b, color, on, st, open, swap, onStart, onDone }) {
+  const stage = on ? 2 : st ? st.stage : 0, kgs = (st && st.kgs) || {};
+  return (
+    <div data-sec={b.id} style={{ background: "var(--ff-surface)", border: `1px solid ${on ? tint(color, 0.45) : stage === 1 ? tint(color, 0.6) : "var(--ff-border)"}`, borderRadius: 16, padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 32 }}>
+        <p style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-display)", fontSize: 15, color: on ? "var(--ff-text-3)" : "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>{b.name}</p>
+        {on ? <span style={{ width: 32, height: 32, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center" }}><ICheck size={18} /></span> : null}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8, marginTop: 12 }}>
+        {simpleStats(b).map((s) => (
+          <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{s.label}</span>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600, color: on ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 14 }}>
+        {b.rows.map((r, ri) => (
+          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "14px 0", borderTop: "1px solid var(--ff-border)" }}>
+            <ExRowHead row={r} onOpen={() => open(b, r)} onSwap={swap ? () => swap(b, r) : null} done={on} />
+            {kgs[r.ex.name] != null ? <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", fontVariantNumeric: "tabular-nums" }}><span style={{ color: "var(--ff-text-3)" }}>Peso</span> {fmtKg(kgs[r.ex.name])} kg</span> : null}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 14, borderTop: "1px solid var(--ff-border)" }}>
+        {stage === 1 ? <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color, marginBottom: 4 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: color }} />En curso</span> : null}
+        {stage === 2 ? <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#2ECF7A" }}>Sección completada</span> : (
+          <>
+            <Button onClick={stage === 0 ? onStart : onDone}>{stage === 0 ? "Empezar sección" : "Terminé la sección"}</Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+function SectionList({ blocks, isOn, toggle, open, pro, weights = {}, onKg, plog = {}, onSeries, prec = {}, setPrec, tlog = {}, onTimed, swap }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {blocks.map((b) => {
+        if (b.type === "rest") return (
+          <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px" }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>Descanso</span>
+            <span style={{ flex: 1, height: 1, background: "var(--ff-border)" }} />
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", fontVariantNumeric: "tabular-nums" }}>{fmt(b.secs)}</span>
+          </div>
+        );
+        const color = HEX[b.type], on = isOn(b.dkey);
+        if (pro && (b.type === "cycle" || b.type === "stripset")) return <ProSectionCard2 key={b.id} b={b} color={color} on={on} rec={prec[b.id]} setRec={(f) => setPrec(b.id, f)} open={open} swap={swap} onComplete={() => toggle(b.dkey)} />;
+        if (pro && ["fortime", "amrap", "emom"].indexOf(b.type) >= 0) return <TimedProCard key={b.id} b={b} color={color} on={on} st={tlog[b.id]} open={open} swap={swap} onStart={() => onTimed(b, "pre")} onDone={() => onTimed(b, "feel")} />;
+        return (
+          <div key={b.id} style={{ background: "var(--ff-surface)", border: `1px solid ${on ? tint(color, 0.45) : "var(--ff-border)"}`, borderRadius: 16, padding: "14px 8px 16px 16px", transition: "border-color .15s ease" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 15, color: on ? "var(--ff-text-3)" : "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>{b.name}</p>
+              </div>
+              <button onClick={() => toggle(b.dkey)} role="checkbox" aria-checked={on} aria-label={"Completar " + b.name} style={{ width: 52, height: 52, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+                <span style={{ width: 32, height: 32, borderRadius: "50%", boxSizing: "border-box", border: on ? "none" : "2px solid var(--ff-text-3)", background: on ? color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "background .12s ease" }}>{on ? <ICheck size={18} /> : null}</span>
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 8, marginTop: 12, paddingRight: 8 }}>
+              {simpleStats(b).map((st) => (
+                <div key={st.label} style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{st.label}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 20, fontWeight: 600, color: on ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st.value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", marginTop: 14, paddingRight: 8 }}>
+              {b.rows.map((r, ri) => (
+                <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px 0", borderTop: "1px solid var(--ff-border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}><ExName row={r} onOpen={() => open(b, r)} done={on} /></div>
+                    {r.sides ? null : <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.target}</span>}
+                    {pro && isLoadedRow(r) ? <KgPill value={weights[r.ex.name]} done={on} onClick={() => onKg(b, r)} /> : null}
+                  </div>
+                  {r.sides ? r.sides.map((sd) => (
+                    <div key={sd} style={{ display: "flex", alignItems: "baseline", gap: 12, paddingLeft: 12, borderLeft: "1px solid var(--ff-border)" }}>
+                      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 13, color: on ? "var(--ff-text-3)" : "var(--ff-text-2)" }}>{sd}</span>
+                      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.target}</span>
+                    </div>
+                  )) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+function ChangeExerciseScreen({ exercise, onBack, onConfirm, poolOverride }) {
+  const ex = exercise || { name: "Ejercicio", img: null };
+  const info = getExerciseInfo(ex.name);
+  const pool = poolOverride || window.FF_DATA.changeExercisePool || [];
+  const relatedPool = pool.filter(p => p.name !== ex.name);
+  const items = [{ name: ex.name, img: ex.img, videoUrl: info.videoUrl, muscles: info.muscles, instructions: info.instructions }, ...relatedPool];
+  const [activeIdx, setActiveIdx] = React.useState(0);
+  const [playKey, setPlayKey] = React.useState(0);
+  const railRef = React.useRef(null);
+  const preview = items[activeIdx] || items[0];
+  const selected = activeIdx > 0 ? items[activeIdx] : null;
+
+  // Deslizar el carrusel cambia el reproductor; tocar una tarjeta lo centra y reproduce su video.
+  const pick = (i, fromScroll) => {
+    setActiveIdx(i);
+    setPlayKey((k) => k + 1);
+    if (!fromScroll && railRef.current) railRef.current.scrollTo({ left: i * 144, behavior: "smooth" });
+  };
+
+  const emptyState = (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 10, padding: "8px 20px 20px" }}>
+      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ff-text-3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+      </div>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 14, color: "var(--ff-text)", margin: 0 }}>No hay ejercicios disponibles</p>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0, lineHeight: 1.5, maxWidth: 260 }}>No encontramos alternativas para este ejercicio por ahora.</p>
+    </div>
+  );
+
+  const cta = (
+    <Button variant="primary" disabled={!selected} onClick={() => selected && onConfirm(selected)}>
+      {selected ? `Cambiar a ${selected.name}` : "Selecciona un ejercicio"}
+    </Button>
+  );
+
+  const media = (fit) => (
+    preview.videoUrl ? (
+      <video key={preview.videoUrl + playKey} src={preview.videoUrl} poster={preview.img} controls autoPlay loop muted playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: fit, display: "block" }} />
+    ) : preview.img ? (
+      <img src={preview.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    ) : null
+  );
+
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Cambiar ejercicio">
+      <div style={{ width: "100%", paddingTop: "56.25%", background: "#000", position: "relative", flexShrink: 0, minHeight: 0, overflow: "hidden" }}>
+        <MediaBackBtn onBack={onBack} />
+        {media("contain")}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", margin: 0, lineHeight: 1.3 }}>{preview.name}</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", margin: 0 }}>
+            {(preview.muscles && preview.muscles.length ? preview.muscles.join(", ") : "Sin grupo muscular")}{activeIdx === 0 ? " · Ejercicio actual" : ""}
+          </p>
+        </div>
+        <ChangeExerciseCues item={preview} />
+      </div>
+
+      {items.length > 1 ? (
+        <div style={{ flexShrink: 0, paddingTop: 4 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 16px 8px" }}>Ejercicios relacionados</p>
+          <ChangeExerciseCarousel items={items} activeIdx={activeIdx} onPick={pick} scrollRef={railRef} />
+        </div>
+      ) : emptyState}
+
+      <div style={{ flexShrink: 0, padding: "14px 16px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>{cta}</div>
+    </div>
+  );
+}
+
+function ChangeExerciseCarousel({ items, activeIdx, onPick, scrollRef }) {
+  const CARD = 132, GAP = 12;
+  const onScroll = (e) => {
+    const el = e.currentTarget;
+    const idx = Math.round(el.scrollLeft / (CARD + GAP));
+    if (idx !== activeIdx && idx >= 0 && idx < items.length) onPick(idx, true);
+  };
+  return (
+    <div
+      ref={scrollRef}
+      onScroll={onScroll}
+      style={{ display: "flex", gap: GAP, overflowX: "auto", scrollSnapType: "x mandatory", padding: "0 16px 4px", scrollbarWidth: "none", flexShrink: 0 }}
+    >
+      {items.map((it, i) => {
+        const active = i === activeIdx;
+        return (
+          <div key={it.name} onClick={() => onPick(i)} style={{ width: CARD, flexShrink: 0, scrollSnapAlign: "center", cursor: "pointer" }}>
+            <div style={{ width: CARD, height: 94, borderRadius: 12, overflow: "hidden", background: "var(--ff-surface-2)", border: active ? "2px solid var(--ff-red)" : "1px solid var(--ff-border)", opacity: active ? 1 : 0.55, position: "relative" }}>
+              {it.img ? <img src={it.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+              {i === 0 && (
+                <span style={{ position: "absolute", top: 6, left: 6, fontFamily: "var(--font-body)", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "#fff", background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "2px 7px" }}>ACTUAL</span>
+              )}
+            </div>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: active ? "var(--ff-text)" : "var(--ff-text-3)", margin: "6px 0 0", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{it.name}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChangeExerciseCues({ item, tone = "dark" }) {
+  const cues = item.cues || (window.FF_DATA.exerciseCues || {})[item.name] || (item.instructions || []).slice(0, 2);
+  if (!cues || !cues.length) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {cues.slice(0, 3).map((c, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <span style={{ width: 4, height: 4, borderRadius: "50%", background: tone === "dark" ? "var(--ff-text-3)" : "rgba(255,255,255,.5)", marginTop: 7, flexShrink: 0 }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: tone === "dark" ? "var(--ff-text-2)" : "rgba(255,255,255,.8)", lineHeight: 1.45 }}>{c}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getExerciseInfo(name) {
+  return (window.FF_DATA.exerciseLibrary || {})[name] || { muscles: [], instructions: [], videoUrl: null };
+}
+
+function MediaBackBtn({ onBack }) {
+  return (
+    <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}>
+      <CircleIconBtn kind="back" onClick={onBack} onMedia />
+    </div>
+  );
+}
+
+
+function ListInstructionSheet({ item, onClose, onChange }) {
+  const [video, setVideo] = React.useState(false);
+  const lib = (window.FF_DATA.exerciseLibrary || {})[item.row.ex.name] || {};
+  const steps = lib.instructions || (window.FF_DATA.exerciseCues || {})[item.row.ex.name] || [];
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 28px", maxHeight: "82%", overflowY: "auto", boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+        <div onClick={onClose} style={{ display: "flex", justifyContent: "center", padding: "0 0 14px", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: 12, overflow: "hidden", background: "#111" }}>
+          {video && lib.videoUrl ? (
+            <video src={lib.videoUrl} controls autoPlay playsInline style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <button onClick={() => setVideo(true)} style={{ position: "absolute", inset: 0, border: "none", padding: 0, cursor: "pointer", background: "transparent" }}>
+              <img src={item.row.ex.img} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <span style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,.1))" }} />
+              <span style={{ position: "absolute", left: 12, bottom: 12, display: "flex", alignItems: "center", gap: 8, height: 34, padding: "0 14px 0 10px", borderRadius: 32, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.28)", color: "#fff", fontFamily: "var(--font-display)", fontSize: 11 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="6 4 20 12 6 20" /></svg>Ver video
+              </span>
+            </button>
+          )}
+        </div>
+        <div style={{ height: 16 }} />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--ff-text)", letterSpacing: "-.3px", lineHeight: 1.35, margin: "0 0 4px" }}>{item.row.ex.name}</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "0 0 12px" }}>{item.block.name} · {item.row.target}</p>
+        {lib.muscles && lib.muscles.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>{lib.muscles.map((m) => <Badge key={m}>{m}</Badge>)}</div> : null}
+        {steps.length ? (
+          <>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 8px" }}>Instrucciones</p>
+            <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {steps.map((s, i) => (
+                <li key={i} style={{ display: "flex", gap: 10 }}>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text-3)", width: 14, flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text)", lineHeight: 1.45, textWrap: "pretty" }}>{s}</span>
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+function ListModeScreen({ preset = "empty", sheetOpen = false, bilateral = false, pro = true, kgOpen = false, proSheet = null, timedDemo = null, tableDemo = "progress", swapDemo = null }) {
+  const blocks = React.useMemo(() => {
+    const bl = buildRoutine();
+    if (bilateral) {
+      const t = bl.find((b) => b.type === "cycle" && b.rows.length > 1) || bl.find((b) => b.type === "cycle");
+      const lib = (window.FF_DATA.exerciseLibrary || {})["Sentadilla búlgara"] || {};
+      if (t) t.rows = [{ ex: { name: "Sentadilla búlgara", img: lib.img, desc: { kind: "repeats", reps: 10 } }, target: "10 reps", sides: ["Pierna derecha", "Pierna izquierda"] }, ...t.rows];
+    }
+    if (pro) bl.forEach((b) => {
+      const im = b.rows && b.rows[0] ? b.rows[0].ex.img : undefined;
+      const mk = (name, reps) => ({ ex: { name, img: im, desc: { kind: "repeats", reps } }, target: reps + " reps" });
+      if (b.type === "fortime") b.rows = [mk("Thruster con mancuernas", 10), mk("Remo con barra", 12), ...b.rows];
+      if (b.type === "amrap") b.rows = [mk("Swing con kettlebell", 15), ...b.rows];
+    });
+    return bl;
+  }, []);
+  const work = blocks.filter((b) => b.type !== "rest");
+  const allKeys = work.map((b) => b.dkey);
+  const [checks, setChecks] = React.useState(() => { const o = {}; if (preset === "all") allKeys.forEach((k) => { o[k] = true; }); return o; });
+  const [sheet, setSheet] = React.useState(() => sheetOpen ? { block: work[0], row: work[0].rows[0] } : null);
+  const [scrolled, setScrolled] = React.useState(false);
+  const [weights, setWeights] = React.useState(() => {
+    const o = {}, seed = [22.5, 15];
+    work.forEach((b) => b.rows.forEach((r) => { if (seed.length && isLoadedRow(r) && o[r.ex.name] == null) o[r.ex.name] = seed.shift(); }));
+    return o;
+  });
+  const [kgSheet, setKgSheet] = React.useState(() => {
+    if (!kgOpen) return null;
+    for (const b of work) for (const r of b.rows) if (isLoadedRow(r) && weights[r.ex.name] == null) return { b, r };
+    return null;
+  });
+  const [kgDraft, setKgDraft] = React.useState(20);
+  const seriesBlocks = work.filter((b) => b.type === "cycle" || b.type === "stripset");
+  const seedEntry = (b) => Object.fromEntries(b.rows.filter(logRow).map((r) => [r.ex.name, { reps: repsOf(r) ?? 10, kg: LAST_KG[r.ex.name] ?? (isLoadedRow(r) ? 20 : null), unit: "kg" }]));
+  const [plog, setPlog] = React.useState(() => {
+    const o = {}, b0 = seriesBlocks[0];
+    if (pro && b0) { const d = proSheet === "last" ? b0.n - 1 : 1; o[b0.id] = { done: d, entries: Array.from({ length: d }, () => seedEntry(b0)) }; }
+    return o;
+  });
+  const [ssheet, setSsheet] = React.useState(() => (proSheet && seriesBlocks[0] ? seriesBlocks[0] : null));
+  const [precS, setPrecS] = React.useState(() => {
+    const o = {}, b0 = seriesBlocks[0];
+    if (!pro || !b0 || timedDemo) return o;
+    const rows = {}, open = {};
+    b0.rows.filter(logRow).forEach((r, ri) => {
+      const tr = repsOf(r) ?? 10, kg = LAST_KG[r.ex.name] ?? (isLoadedRow(r) ? 20 : null);
+      const doneN = tableDemo === "feel" || ri === 1 ? b0.n : ri === 0 ? 2 : 1;
+      rows[r.ex.name] = Array.from({ length: b0.n }, (_, i) => (i < doneN ? { kg: kg == null ? "" : String(kg), reps: String(i === 1 ? tr - 1 : tr), done: true } : { kg: "", reps: "", done: false }));
+      open[r.ex.name] = tableDemo === "progress" && ri === 0;
+      if (tableDemo === "closed") open[r.ex.name] = false;
+    });
+    o[b0.id] = { rows, open, unit: {}, feel: null };
+    return o;
+  });
+  const setPrec = (id, f) => setPrecS((p) => ({ ...p, [id]: f(p[id] || { rows: {}, open: {}, unit: {}, feel: null }) }));
+  const timedBlocks = work.filter((b) => ["fortime", "amrap", "emom"].indexOf(b.type) >= 0);
+  const ftB = timedBlocks.find((b) => b.type === "fortime"), emB = timedBlocks.find((b) => b.type === "emom");
+  const [tlog, setTlog] = React.useState(() => (ftB && (timedDemo === "running" || timedDemo === "feel") ? { [ftB.id]: { stage: 1, kgs: { "Thruster con mancuernas": 12.5, "Remo con barra": 40 } } } : {}));
+  const [tsheet, setTsheet] = React.useState(() => timedDemo === "pre" ? { b: ftB, kind: "pre" } : timedDemo === "preAmrap" ? { b: timedBlocks.find((b) => b.type === "amrap"), kind: "pre" } : timedDemo === "feel" ? { b: ftB, kind: "feel" } : timedDemo === "feelAmrap" ? { b: timedBlocks.find((b) => b.type === "amrap"), kind: "feel" } : timedDemo === "feelEmom" ? { b: emB, kind: "feel" } : timedDemo === "emom" ? { b: emB, kind: "pre" } : null);
+  const scRef = React.useRef(null);
+  React.useEffect(() => {
+    const sc = scRef.current, tb = (tsheet && tsheet.b) || ftB;
+    if (!timedDemo || !sc || !tb) return;
+    const el = sc.querySelector('[data-sec="' + tb.id + '"]');
+    if (!el) return;
+    const k = sc.getBoundingClientRect().height / sc.offsetHeight || 1;
+    sc.scrollTop = (el.getBoundingClientRect().top - sc.getBoundingClientRect().top) / k - 12;
+  }, []);
+  const saveSeries = (ent) => {
+    const b = ssheet, cur = plog[b.id] || { done: 0, entries: [] };
+    setPlog((p) => ({ ...p, [b.id]: { done: cur.done + 1, entries: [...cur.entries, ent] } }));
+    if (cur.done + 1 >= b.n) setChecks((c) => ({ ...c, [b.dkey]: true }));
+    setSsheet(null);
+  };
+  const onKg = (b, r) => { setKgDraft(weights[r.ex.name] ?? lastKg(r.ex.name)); setKgSheet({ b, r }); };
+  const isOn = (k) => !!checks[k];
+  const toggle = (k) => setChecks((c) => ({ ...c, [k]: !c[k] }));
+  const open = (block, row) => setSheet({ block, row });
+  // Cambiar ejercicio: misma pantalla que en el detalle de rutina; el cambio aplica solo a esta rutina.
+  const [swaps, setSwaps] = React.useState(() => {
+    if (swapDemo !== "done") return {};
+    const b0 = blocks.find((b) => b.type === "cycle"), r0 = b0 && b0.rows[0], alt = (window.FF_DATA.changeExercisePool || []).find((p) => r0 && p.name !== r0.ex.name);
+    return r0 && alt ? { [r0.ex.name]: alt } : {};
+  });
+  const [swapFor, setSwapFor] = React.useState(() => {
+    if (swapDemo !== "sheet" && swapDemo !== "screen") return null;
+    const b0 = blocks.find((b) => b.type === "cycle");
+    return b0 ? { block: b0, row: b0.rows[0] } : null;
+  });
+  React.useEffect(() => { if (swapDemo === "sheet" && swapFor) { setSheet(swapFor); setSwapFor(null); } }, []);
+  const shown = React.useMemo(() => blocks.map((b) => (!b.rows ? b : { ...b, rows: b.rows.map((rw) => {
+    const s = swaps[rw.ex.name];
+    return s ? { ...rw, ex: { ...rw.ex, name: s.name, img: s.img || rw.ex.img }, swappedFrom: rw.ex.name } : rw;
+  }) })), [blocks, swaps]);
+  const total = allKeys.length, done = allKeys.filter(isOn).length, complete = done === total;
+  // Al completar todos los checks la rutina se marca sola y aparece el cierre.
+  const [doneSheet, setDoneSheet] = React.useState(preset === "all");
+  const wasComplete = React.useRef(complete);
+  React.useEffect(() => { if (complete && !wasComplete.current) setDoneSheet(true); wasComplete.current = complete; }, [complete]);
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)" }} data-screen-label="Modo lista">
+      <div style={{ flexShrink: 0, height: 56, display: "flex", flexDirection: "row-reverse", alignItems: "center", gap: 8, padding: "0 12px", position: "relative" }}>
+        <button aria-label="Salir" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <div style={{ position: "absolute", left: 60, right: 60, top: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", opacity: scrolled ? 1 : 0, transform: scrolled ? "none" : "translateY(4px)", transition: "opacity .2s ease, transform .2s ease" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-text)", letterSpacing: "-.2px", margin: 0, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Pecho y tríceps</p>
+        </div>
+      </div>
+      <div ref={scRef} onScroll={(e) => { const s = e.currentTarget.scrollTop > 36; if (s !== scrolled) setScrolled(s); }} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 16px 32px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "4px 2px 16px" }}>Pecho y tríceps</p>
+        <SectionList swap={(block, row) => setSwapFor({ block, row })} blocks={shown} isOn={isOn} toggle={toggle} open={open} pro={pro} weights={weights} onKg={onKg} plog={plog} onSeries={setSsheet} prec={precS} setPrec={setPrec} tlog={tlog} onTimed={(b, kind) => setTsheet({ b, kind })} />
+      </div>
+      {tsheet && tsheet.kind === "pre" ? (
+        <PreSectionWeights listMode block={{ ...tsheet.b.src, type: tsheet.b.type, minutesTotal: tsheet.b.n }} color={HEX[tsheet.b.type]} exList={tsheet.b.rows.filter(loadedForPre).map((r) => r.ex)}
+          onStart={(kgs) => { setTlog((t) => ({ ...t, [tsheet.b.id]: { stage: 1, kgs } })); setTsheet(null); }}
+          onSkip={() => { setTlog((t) => ({ ...t, [tsheet.b.id]: { stage: 1, kgs: {} } })); setTsheet(null); }} />
+      ) : null}
+      {tsheet && tsheet.kind === "feel" ? <FeelSheet block={tsheet.b} onClose={() => setTsheet(null)} onSave={() => { setTlog((t) => ({ ...t, [tsheet.b.id]: { ...(t[tsheet.b.id] || {}), stage: 2 } })); setChecks((c) => ({ ...c, [tsheet.b.dkey]: true })); setTsheet(null); }} /> : null}
+      {ssheet ? <SeriesSheet block={ssheet} serie={((plog[ssheet.id] || {}).done || 0) + 1} total={ssheet.n} prev={((plog[ssheet.id] || {}).entries || []).slice(-1)[0]} onClose={() => setSsheet(null)} onSave={saveSeries} /> : null}
+      {kgSheet ? <WeightSheet ex={kgSheet.r.ex} block={kgSheet.b.name} note="Un peso por ejercicio: el que usaste en tus series de trabajo." kg={kgDraft} setKg={setKgDraft} cta="Guardar"
+        onClose={() => setKgSheet(null)} onSave={() => { setWeights((w) => ({ ...w, [kgSheet.r.ex.name]: kgDraft })); setKgSheet(null); }} /> : null}
+      {sheet ? <ListInstructionSheet item={sheet} onClose={() => setSheet(null)} /> : null}
+      {swapFor ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 40, background: "#FFFFFF" }}>
+          <ChangeExerciseScreen exercise={swapFor.row.ex} onBack={() => setSwapFor(null)}
+            onConfirm={(alt) => { const orig = swapFor.row.swappedFrom || swapFor.row.ex.name; setSwaps((s) => ({ ...s, [orig]: alt })); setSwapFor(null); }} />
+        </div>
+      ) : null}
+      {doneSheet ? (
+        <div style={{ position: "absolute", inset: 0, zIndex: 35, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div onClick={() => setDoneSheet(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+          <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 -8px 32px rgba(0,0,0,.4)" }}>
+            <div onClick={() => setDoneSheet(false)} style={{ display: "flex", justifyContent: "center", cursor: "pointer" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center", padding: "8px 0 4px" }}>
+              <span style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(46,207,122,0.14)", display: "flex", alignItems: "center", justifyContent: "center" }}><ICheck color="#2ECF7A" size={26} w={2.8} /></span>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>¡Rutina completada!</p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 14, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, maxWidth: 280, textWrap: "pretty" }}>Lo hiciste genial. Cada rutina te acerca a tu objetivo. ¡Sigue así!</p>
+            </div>
+            <Button>Salir</Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+const { SectionBadge } = window.FitFightersDesignSystem_4614fc;
+const LIGHT = {
+  "--ff-bg": "#F7F7F7", "--ff-surface": "#FFFFFF", "--ff-surface-2": "#F1F1F1", "--ff-border": "#E2E2E2",
+  "--ff-text": "#141414", "--ff-text-2": "#5C5C5C", "--ff-text-3": "#8E8E8E", "--ff-red-light": "#CC2800",
+  "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+const MODES = [
+  { key: "trainer", name: "Entrenador virtual", desc: "Video de cada ejercicio, cronómetros y avance automático." },
+  { key: "list", name: "Lista de ejercicios", desc: "Toda la rutina en una lista. Marcas cada serie a tu ritmo." },
+];
+const Radio = ({ on }) => <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box", border: on ? "6px solid var(--ff-red)" : "2px solid var(--ff-text-3)", transition: "border .15s ease" }} />;
+function ModePreferenceScreen() {
+  const [mode, setMode] = React.useState("list");
+  const [pro, setPro] = React.useState(true);
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...LIGHT }} data-screen-label="Modo de entrenamiento">
+      <div style={{ height: 56, display: "flex", alignItems: "center", padding: "0 12px", flexShrink: 0 }}>
+        <button aria-label="Volver" style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--ff-border)", background: "var(--ff-surface)", color: "var(--ff-text)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 24px" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 2px 6px" }}>Modo de entrenamiento</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: "0 2px 20px", textWrap: "pretty" }}>Elige cómo ver tu rutina al entrenar. Tu programa y tu progreso no cambian.</p>
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+          {MODES.map((m, i) => {
+            const sel = m.key === mode;
+            return (
+              <button key={m.key} onClick={() => setMode(m.key)} role="radio" aria-checked={sel} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 72, padding: "14px 16px", background: "transparent", border: "none", borderTop: i ? "1px solid var(--ff-border)" : "none", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: sel ? 600 : 400, color: "var(--ff-text)", margin: 0 }}>{m.name}</p>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>{m.desc}</p>
+                </div>
+                <Radio on={sel} />
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.5, margin: "12px 2px 0" }}>Se aplica desde tu próxima rutina.</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "28px 2px 8px" }}>Avanzado</p>
+        <div style={{ background: "var(--ff-surface)", border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+          <button onClick={() => setPro((p) => !p)} role="switch" aria-checked={pro} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 72, padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>Modo pro</p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>Registra el peso que cargas en cada ejercicio, en la lista y en el entrenador virtual.</p>
+            </div>
+            <span style={{ width: 44, height: 26, borderRadius: 999, flexShrink: 0, position: "relative", background: pro ? "var(--ff-red)" : "var(--ff-border)", transition: "background .15s ease" }}>
+              <span style={{ position: "absolute", top: 3, left: pro ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s ease" }} />
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function FirstTimeModeSheet() {
+  const [mode, setMode] = React.useState("list");
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...LIGHT }} data-screen-label="Elegir modo · primera vez">
+      <div style={{ padding: "72px 18px 0" }}>
+        <SectionBadge type="cycle" label="Martes" />
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--ff-text)", letterSpacing: "-.4px", margin: "8px 0 0" }}>Pecho y tríceps</p>
+      </div>
+      <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+        <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "center" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+          <div>
+            <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>¿Cómo quieres entrenar?</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras en Perfil › Preferencias.</p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {MODES.map((m) => {
+              const sel = m.key === mode;
+              return (
+                <button key={m.key} onClick={() => setMode(m.key)} role="radio" aria-checked={sel} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 12, border: `1px solid ${sel ? "var(--ff-red)" : "var(--ff-border)"}`, background: sel ? "var(--ff-primary-container)" : "transparent", cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>{m.name}</p>
+                    <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>{m.desc}</p>
+                  </div>
+                  <Radio on={sel} />
+                </button>
+              );
+            })}
+          </div>
+          <Button>Comenzar rutina</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+window.FFWModePreference = ModePreferenceScreen;
+window.FFWFirstTime = FirstTimeModeSheet;
+window.FFWListMode = ListModeScreen;
+})();
+
+
+// Datos de muestra: For time y AMRAP con ejercicios con carga (los datos base son de peso corporal).
+function proDemoBlocks() {
+  return (window.FF_DATA.trainerBlocks || []).map((b) => {
+    const im = (b.exercises || [])[0] ? b.exercises[0].img : b.img;
+    if (b.type === "fortime") return { ...b, exercises: [{ name: "Thruster con mancuernas", reps: 10, img: im }, { name: "Remo con barra", reps: 12, img: im }, { name: "Peso muerto con barra", reps: 8, img: im }, { name: "Press de hombro con mancuernas", reps: 10, img: im }, { name: "Sentadilla goblet", reps: 12, img: im }, b.exercises[0]] };
+    if (b.type === "amrap") return { ...b, exercises: [{ name: "Swing con kettlebell", reps: 15, img: im }, b.exercises[0]] };
+    return b;
+  });
+}
+
+
+
+// ── Resumen · modo pro ──
+const APP_LIGHT = { "--ff-surface": "#FFFFFF", "--ff-surface-2": "#F1F1F1", "--ff-border": "#E2E2E2", "--ff-text": "#141414", "--ff-text-2": "#5C5C5C", "--ff-text-3": "#8E8E8E", "--ff-red-light": "#CC2800", "--ff-primary-container": "rgba(255,50,0,0.10)" };
+const APP_LIGHT_BG = { "--ff-bg": "rgba(255,255,255,0.90)" };
+// Muestra: lo que el usuario registró en la rutina.
+const PRO_SUM = {
+  "Ciclo 1": { feel: "Moderada", ex: [
+    { name: "Press inclinado mancuerna", sets: [[22.5, 15], [22.5, 14]] },
+    { name: "Aperturas banco plano", sets: [[12, 12], [14, 12]] },
+    { name: "Press militar sentado", unit: "lb", sets: [[45, 10], [45, 9]] },
+  ] },
+  "For time 1": { feel: "Muy pesada", ex: [{ name: "Thruster con mancuernas", kg: 12.5 }] },
+  "Amrap 1": { feel: "Ligera" },
+  "Emom 1": { feel: "Moderada", ex: [{ name: "Press con barra", kg: 30 }] },
+  "Stripset 1": { feel: "Muy pesada", ex: [{ name: "Curl de bíceps", sets: [[25, 12], [20, 10], [15, 8], [12.5, 8], [10, 6]] }, { name: "Extensión tríceps", sets: [[15, 12], [15, 10], [15, 10], [15, 8], [15, 8]] }] },
+};
+function proVolume() {
+  let v = 0;
+  Object.values(PRO_SUM).forEach((d) => (d.ex || []).forEach((e) => (e.sets || []).forEach(([w, n]) => { v += w * n * (e.unit === "lb" ? 0.4536 : 1); })));
+  return Math.round(v);
+}
+// Mismo peso en todas las series: «22.5 kg × 15, 15, 14». Si cambió: serie por serie.
+function fmtSets(e) {
+  const u = e.unit || "kg";
+  if (!e.sets) return fmtKg(e.kg) + " " + u;
+  const same = e.sets.every((x) => x[0] === e.sets[0][0]);
+  return same ? fmtKg(e.sets[0][0]) + " " + u + " × " + e.sets.map((x) => x[1]).join(", ") : e.sets.map((x) => fmtKg(x[0]) + " " + u + " × " + x[1]).join(" · ");
+}
+function ProSumDetail({ d }) {
+  if (!d) return null;
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--ff-border)", display: "flex", flexDirection: "column", gap: 10 }}>
+      {(d.ex || []).map((e) => (
+        <div key={e.name} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text)" }}>{e.name}</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", fontVariantNumeric: "tabular-nums", textWrap: "pretty" }}>{fmtSets(e)}</span>
+        </div>
+      ))}
+      {d.feel ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>Sensación</span>
+          <Badge>{d.feel}</Badge>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CircleIconBtn({ kind = "back", onClick, onMedia, plain }) {
+  const stroke = onMedia ? "#fff" : "var(--ff-text)";
+  return (
+    <button onClick={onClick} aria-label={kind === "close" ? "Cerrar" : "Atrás"} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+      background: plain ? "transparent" : onMedia ? "rgba(0,0,0,0.45)" : "rgba(20,20,20,0.06)", backdropFilter: onMedia ? "blur(6px)" : "none", WebkitBackdropFilter: onMedia ? "blur(6px)" : "none", transition: "background .2s ease" }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {kind === "close" ? <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g> : <path d="M19 12H5M12 5l-7 7 7 7" />}
+      </svg>
+    </button>
+  );
+}
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div style={{ background: "var(--ff-surface)", borderRadius: 12, padding: 14, border: "1px solid var(--ff-border)" }}>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 6px" }}>{label}</p>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 26, color: "var(--ff-text)", margin: 0 }}>{value}</p>
+      <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "2px 0 0" }}>{sub}</p>
+    </div>
+  );
+}
+
+function SummaryScreen({ onHome, onMilestone, beta = false, feedback = {}, feedbackQuestion = null, focusFeedback, feedbackLive = true, offline, micDenied, pro = true, focusDetail = false }) {
+  const detailRef = React.useRef(null);
+  React.useLayoutEffect(() => { if (focusDetail && scrollRef.current && detailRef.current) scrollRef.current.scrollTop = detailRef.current.offsetTop - 16; }, []);
+  const s = window.FF_DATA.summary;
+  const scrollRef = React.useRef(null);
+  const cardRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    if (focusFeedback && scrollRef.current && cardRef.current) scrollRef.current.scrollTop = cardRef.current.offsetTop - 16;
+  }, [focusFeedback]);
+  return (
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column", background: "var(--ff-bg)", ...APP_LIGHT_BG, ...APP_LIGHT }} data-screen-label="Resumen">
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", paddingBottom: 110, position: "relative" }}>
+      {/* Hero */}
+      <div style={{ position: "relative", height: 190, overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,50,0,.12) 0%, rgba(255,154,60,.08) 55%, rgba(46,207,122,.07) 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(15,15,15,.2) 0%, var(--ff-bg) 100%)" }} />
+        <div style={{ position: "absolute", top: 14, left: 14, zIndex: 3 }}><CircleIconBtn kind="back" onClick={onHome} /></div>
+        <div style={{ position: "absolute", bottom: 20, left: 20, right: 20 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ff-text-2)", margin: "0 0 4px" }}>{s.program}</p>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ff-text)", margin: 0 }}>{s.routine}</h1>
+        </div>
+      </div>
+
+      <div style={{ padding: "8px 20px 0", display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Completion */}
+        <div style={{ textAlign: "center", padding: "12px 0 0" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 60, height: 60, borderRadius: "50%", background: "var(--ff-primary-container)", border: "2px solid var(--ff-red)", marginBottom: 12 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ff-red)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 12, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--ff-red)", margin: "0 0 2px" }}>Rutina completada</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)", margin: 0 }}>¡Excelente trabajo, sigue así!</p>
+        </div>
+
+        {/* Logro desbloqueado: mismo enlace del catálogo, ahora arriba */}
+        <button onClick={onMilestone} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-red-light)", padding: "0 0 4px", textAlign: "center" }}>
+          Ver logro desbloqueado
+        </button>
+
+        {/* TEMPORAL · feedback beta */}
+        {beta ? <div ref={cardRef}><FeedbackCard initial={feedback} question={feedbackQuestion} live={feedbackLive} offline={offline} micDenied={micDenied} /></div> : null}
+
+        {/* Total time */}
+        <div style={{ background: "var(--ff-surface)", borderRadius: 16, padding: 20, border: "1px solid var(--ff-border)" }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "0 0 6px" }}>Tiempo total</p>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 38, color: "var(--ff-text)", margin: 0 }}>{s.totalTime}</p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <StatCard label="Ejercicios" value={s.exercises} sub="realizados" />
+          <StatCard label="Secciones" value={s.sectionsCount} sub="completadas" />
+        </div>
+
+        <p ref={detailRef} style={{ fontFamily: "var(--font-body)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: "4px 0 0" }}>Detalle por sección</p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {s.rows.map((r, i) => {
+            return (
+              <div key={i} style={{ background: "var(--ff-surface)", borderRadius: 12, padding: "14px 16px", border: "1px solid var(--ff-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <SectionBadge type={r.type} showLabel={false} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontFamily: "var(--font-body)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ff-text-2)", margin: "0 0 2px" }}>{SECTION_TYPES[r.type].label}</p>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 13, color: "var(--ff-text)", margin: 0 }}>{r.name}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 16, margin: 0, color: r.muted ? "var(--ff-text-3)" : "var(--ff-text)" }}>
+                    {r.value}{r.unit ? <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)", fontWeight: 400 }}> {r.unit}</span> : null}
+                  </p>
+                  {r.sub ? <p style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "var(--ff-text-3)", margin: "1px 0 0" }}>{r.sub}</p> : null}
+                </div>
+              </div>
+              {pro ? <ProSumDetail d={PRO_SUM[r.name]} /> : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ height: 4 }} />
+      </div>
+      </div>
+
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "12px 20px 28px", background: "linear-gradient(to top, var(--ff-bg) 75%, transparent)" }}>
+        <Button variant="primary" onClick={onHome}>Volver al inicio</Button>
+      </div>
+    </div>
+  );
+}
+
+window.FFProSummary = SummaryScreen;
+window.FFProTrainer = TrainerImmersiveScreen;
+window.FFProDemoBlocks = proDemoBlocks;
+
+})();
+
 // ── Catalog — static grid of every screen in its reference state ──────────────
 // Non-interactive: each screen is shown inside a scaled device frame with a label.
 
@@ -6775,6 +8822,37 @@ function Catalog() {
         { label: "Enviar feedback", note: "Sin conexión · en cola", el: <FeedbackScreen initial={{ phase: "queued" }} onBack={noop} /> },
         { label: "Enviar feedback", note: "Micrófono denegado", el: <FeedbackScreen initial={{ mode: "voice", phase: "denied" }} onBack={noop} /> },
       ],
+    },
+    {
+      title: "Modo pro",
+      cells: (() => {
+        const PT = window.FFProTrainer, PL = window.FFWListMode, PM = window.FFWModePreference, PS = window.FFProSummary, demo = window.FFProDemoBlocks();
+        const T = (p) => React.createElement(PT, p), L = (p) => React.createElement(PL, p), S = (p) => React.createElement(PS, { onHome: noop, onMilestone: noop, ...p });
+        return [
+          { label: "Perfil · Modo de entrenamiento", note: "Interruptor «Modo pro» (Avanzado)", el: React.createElement(PM) },
+          { label: "Entrenador · descanso", note: "Serie 1 de 3: reps hechas + peso informativo", el: T({ weight: "rest", blockIdx: 1, restSerie: [1, 3] }) },
+          { label: "Entrenador · descanso", note: "Última serie: + ¿Cómo sentiste tu serie?", el: T({ weight: "rest", blockIdx: 1 }) },
+          { label: "Entrenador · descanso", note: "Editar peso: kg / lb, ±2,5 kg o ±5 lb", el: T({ weight: "rest", blockIdx: 1, restState: "edit" }) },
+          { label: "Entrenador · descanso", note: "Primera vez: peso vacío", el: T({ weight: "rest", blockIdx: 1, restState: "first" }) },
+          { label: "Entrenador · For time", note: "Antes de empezar · pesos", el: T({ blocksOverride: demo, blockIdx: 3, preWeights: true }) },
+          { label: "Entrenador · AMRAP", note: "Antes de empezar · pesos", el: T({ blocksOverride: demo, blockIdx: 4, preWeights: true }) },
+          { label: "Entrenador · EMOM", note: "Explicación + pesos en una hoja", el: T({ blocksOverride: demo, blockIdx: 5, preWeights: true }) },
+          { label: "Modo lista · ejercicio", note: "Nombre, reps · RIR; info y cambiar discretos", el: L({ tableDemo: "closed" }) },
+          { label: "Modo lista · series", note: "Registro de series en la tarjeta", el: L({ tableDemo: "progress" }) },
+          { label: "Modo lista · series", note: "Series completas: + sensación de la sección", el: L({ tableDemo: "feel" }) },
+          { label: "Modo lista · cambiar ejercicio", note: "Misma pantalla del detalle de rutina", el: L({ swapDemo: "screen" }) },
+          { label: "Modo lista · cambiar ejercicio", note: "Ejercicio cambiado (solo esta rutina)", el: L({ swapDemo: "done" }) },
+          { label: "Modo lista · For time", note: "Tarjeta: «Empezar sección» a todo el ancho", el: L({ timedDemo: "card" }) },
+          { label: "Modo lista · For time", note: "Antes de empezar", el: L({ timedDemo: "pre" }) },
+          { label: "Modo lista · For time", note: "Al terminar: tiempo + sensación", el: L({ timedDemo: "feel" }) },
+          { label: "Modo lista · AMRAP", note: "Antes de empezar", el: L({ timedDemo: "preAmrap" }) },
+          { label: "Modo lista · AMRAP", note: "Al terminar: rondas + sensación", el: L({ timedDemo: "feelAmrap" }) },
+          { label: "Modo lista · EMOM", note: "Antes de empezar: explicación + peso", el: L({ timedDemo: "emom" }) },
+          { label: "Modo lista · EMOM", note: "Al terminar: minutos + sensación", el: L({ timedDemo: "feelEmom" }) },
+          { label: "Resumen · modo pro", note: "«Ver logro desbloqueado» arriba", el: S({}) },
+          { label: "Resumen · modo pro", note: "Detalle por sección con pesos y sensación", el: S({ focusDetail: true }) },
+        ];
+      })(),
     },
   ];
 
