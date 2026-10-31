@@ -2317,15 +2317,14 @@ function ProfileScreen({ tab, onTab, onEditProfile, onChangePassword, onChangePr
         <ProfileSectionLabel>Cuenta</ProfileSectionLabel>
         <Card padding="0">
           <MenuRow icon={ProfileIcon(<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>)} label="Editar perfil" onClick={onEditProfile} />
-          <MenuRow icon={ProfileIcon(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>)} label="Modificar o cambiar plan" divider onClick={onChangeProgram} />
+          {/* «Modificar o cambiar plan» se mudó a Workout › Ajustes de entrenamiento (30 oct 2026). */}
           <MenuRow icon={ProfileIcon(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)} label="Cambiar contraseña" sublabel="Solo cuentas con correo" divider onClick={onChangePassword} />
         </Card>
 
-        {/* Preferences */}
+        {/* Preferences · «Modo de entrenamiento» se mudó a Ajustes de entrenamiento y al detalle de rutina. */}
         <ProfileSectionLabel>Preferencias</ProfileSectionLabel>
         <Card padding="0">
           <MenuRow icon={ProfileIcon(<><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>)} label="Idioma" sublabel={(APP_LANGUAGES.find((l) => l.code === lang) || APP_LANGUAGES[0]).name} onClick={onLanguage} />
-          <MenuRow icon={ProfileIcon(<><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>)} label="Modo de entrenamiento" sublabel="Lista de ejercicios" divider onClick={onTrainingMode} />
         </Card>
 
         {/* Support */}
@@ -5650,7 +5649,7 @@ function FirstTimeModeSheet() {
           <div style={{ display: "flex", justifyContent: "center" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
           <div>
             <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>¿Cómo quieres entrenar?</p>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras en Perfil › Preferencias.</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras bajo «Iniciar rutina» o en Workout › Ajustes de entrenamiento.</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {MODES.map((m) => {
@@ -6633,6 +6632,66 @@ function StepRow({ label, extra, value, setValue, step, suffix }) {
     </div>
   );
 }
+// Peso manual con teclado (aprobado 26 oct 2026, opción 1a): hoja anclada al teclado del sistema,
+// nunca flota sobre el número ni los controles. Sin barra «Hecho»: Guardar cierra; la X cancela.
+const KEYPAD_L = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
+function KeypadMock({ onKey }) {
+  return (
+    <div style={{ height: 246, boxSizing: "border-box", background: "#2B2B2D", padding: "6px 6px 30px", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoRows: "minmax(0, 1fr)", gap: 6, flexShrink: 0 }}>
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map((d) => {
+        const fn = d === "." || d === "del";
+        return (
+          <button key={d} onClick={() => onKey(d)} style={{ border: "none", borderRadius: 6, padding: 0, cursor: "pointer", background: fn ? "transparent" : "#5A5A5E", boxShadow: fn ? "none" : "0 1px 0 rgba(0,0,0,.35)", color: "#fff", fontFamily: "-apple-system, system-ui, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 24, lineHeight: 1 }}>{d === "del" ? "⌫" : d}</span>
+            {KEYPAD_L[d] ? <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: ".18em", lineHeight: 1.3 }}>{KEYPAD_L[d]}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+function WeightKeypadSheet({ ex, serie, kg, last, unit: unit0 = "kg", onSave, onClose }) {
+  const [val, setVal] = React.useState(kg == null ? "" : String(kg));
+  const [unit, setUnit] = React.useState(unit0);
+  const key = (k) => setVal((v) => {
+    if (k === "del") return v.slice(0, -1);
+    if (k === "." && (v.includes(".") || v === "")) return v;
+    if (v.length >= 5) return v;
+    return v === "0" && k !== "." ? k : v + k;
+  });
+  const n = parseFloat(val);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,.62)", ...R7_SHEET }}>
+      <div onClick={onClose} style={{ flex: 1 }} />
+      <div style={{ background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "24px 24px 0 0", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" }}>{serie ? "Peso · Serie " + serie[0] + " de " + serie[1] : "Peso"}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: "-.3px", color: "var(--ff-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.name}</span>
+          </div>
+          <button onClick={onClose} aria-label="Cancelar" style={{ width: 36, height: 36, margin: "-4px -4px 0 0", borderRadius: 999, border: "none", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <div style={{ height: 76, borderRadius: 14, border: "1px solid var(--ff-green)", background: "var(--ff-bg)", display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 38, letterSpacing: "-1px", lineHeight: 1, color: val ? "var(--ff-text)" : "var(--ff-text-3)", fontVariantNumeric: "tabular-nums" }}>{val || "0"}</span>
+          <span style={{ width: 2, height: 34, background: "var(--ff-green)", borderRadius: 1, margin: "0 6px 0 3px" }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 16, fontWeight: 600, color: "var(--ff-text-2)", marginTop: 8 }}>{unit}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          {last != null ? <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Última vez <span style={{ color: "var(--ff-text-2)", fontWeight: 600 }}>{fmtKg(last)} {unit0}</span></span> : <span />}
+          <div role="radiogroup" aria-label="Unidad" style={{ display: "flex", height: 32, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-bg)" }}>
+            {["kg", "lb"].map((u) => (
+              <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 44, padding: "0 12px", borderRadius: 999, border: "none", cursor: "pointer", background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+            ))}
+          </div>
+        </div>
+        <button disabled={isNaN(n)} onClick={() => onSave(n, unit)} style={{ width: "100%", height: 48, borderRadius: 10, border: "none", cursor: isNaN(n) ? "default" : "pointer", background: isNaN(n) ? "var(--ff-surface-2)" : "var(--ff-red)", color: isNaN(n) ? "var(--ff-text-3)" : "#fff", fontFamily: "var(--font-display)", fontSize: 13, letterSpacing: "-.2px" }}>Guardar</button>
+      </div>
+      <KeypadMock onKey={key} />
+    </div>
+  );
+}
 // Descanso (1c): al terminar la serie se pregunta cómo se sintió y se registran peso y reps.
 // Peso y reps llegan precargados (último peso, reps del plan) y se muestran informativos; editar es opcional.
 function WeightRestCard({ ex, serie, kg, setKg, initial = "info", feel: feel0 = null }) {
@@ -7314,8 +7373,9 @@ function R7Stat({ value, label }) {
   );
 }
 
-function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish, weight = null, weightOpen = false, restState = "info", preWeights = false, restSerie = null }) {
+function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, queueOpen = false, paused = false, showPreroll = false, finishOpen = false, live = false, emomIntro = false, forceLast = false, onExit, onFinish, weight = null, weightOpen = false, restState = "info", preWeights = false, restSerie = null, keypad = false }) {
   const [pre, setPre] = React.useState(preWeights);
+  const [kp, setKp] = React.useState(keypad);
   const [wSheet, setWSheet] = React.useState(weightOpen);
   const [kg, setKg] = React.useState(restState === "first" ? null : 22.5);
   const wGate = React.useRef(false);
@@ -7571,6 +7631,7 @@ function TrainerImmersiveScreen({ blocksOverride, blockIdx = 0, stepIdx = 0, que
             onSave={() => { setWSheet(false); if (weight === "sheet") { wGate.current = true; goStep(1); } }} />
         </div>
       ) : null}
+      {kp && wCan ? <WeightKeypadSheet ex={wEx} serie={wSerie} kg={kg} last={20} onClose={() => setKp(false)} onSave={(v) => { setKg(v); setKp(false); }} /> : null}
       {preroll !== null && <div style={{ position: "absolute", inset: 0, zIndex: 60, ...R7_SHEET }}><R6Countdown n={showPreroll ? 3 : preroll} name={step.side ? `${biSideFull((step.ex || {}).bilateral, step.side)} · ${curName}` : curName} title={step.side === "der" ? "Cambia de lado" : "Prepárate"} /></div>}
       {pre ? <PreSectionWeights block={block} color={color} isLastSection={forceLast || !blocks[bIdx + 1]} onStart={() => { setPre(false); setIntro(false); }} onSkip={() => { setPre(false); setIntro(false); }} /> : null}
       {intro && !pre && (
@@ -7680,7 +7741,7 @@ function ExRowHead({ row, onOpen, onSwap, done }) {
   );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, lineHeight: 1.3, color: done ? "var(--ff-text-3)" : "var(--ff-text)", textWrap: "pretty" }}>{row.ex.name}</span>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 17, fontWeight: 600, lineHeight: 1.3, color: done ? "var(--ff-text-3)" : "var(--ff-text)", textWrap: "pretty" }}>{row.ex.name}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44 }}>
         <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-body)", fontSize: 14, color: done ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums" }}>{row.target}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: -10 }}>
@@ -7726,9 +7787,9 @@ function SeriesTable({ r, n, list, setList, unit, setUnit, color }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 4 }}>
       <div style={grid}>
-        <span style={head}>Serie</span>
-        <span style={{ ...head, display: "flex", alignItems: "center", gap: 6 }}>Peso{loaded ? <UnitToggle unit={unit} setUnit={setUnit} /> : null}</span>
-        <span style={head}>Reps</span>
+        <span style={{ ...head, textAlign: "center" }}>Serie</span>
+        <span style={{ ...head, textAlign: "center" }}>Peso</span>
+        <span style={{ ...head, textAlign: "center" }}>Reps</span>
         <span style={{ ...head, textAlign: "center" }}>Hecha</span>
       </div>
       {list.map((x, i) => {
@@ -7745,6 +7806,12 @@ function SeriesTable({ r, n, list, setList, unit, setUnit, color }) {
           </div>
         );
       })}
+      {loaded ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <span style={head}>Unidad</span>
+          <UnitToggle unit={unit} setUnit={setUnit} />
+        </div>
+      ) : null}
       {last != null ? (
         <p style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", margin: "4px 0 0", fontVariantNumeric: "tabular-nums" }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
@@ -8345,7 +8412,7 @@ function FirstTimeModeSheet() {
           <div style={{ display: "flex", justifyContent: "center" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
           <div>
             <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>¿Cómo quieres entrenar?</p>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras en Perfil › Preferencias.</p>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Puedes cambiarlo cuando quieras bajo «Iniciar rutina» o en Workout › Ajustes de entrenamiento.</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {MODES.map((m) => {
@@ -8743,7 +8810,7 @@ function Catalog() {
         { label: "Instrucciones", note: "Bottom sheet al tocar un ejercicio", el: <ListModeScreen sheetOpen /> },
         { label: "Ejercicio bilateral", note: "Sentadilla búlgara: reps por pierna", el: <ListModeScreen bilateral /> },
         { label: "Elegir el modo", note: "Primera vez · sheet sobre el detalle de rutina", el: <FirstTimeModeSheet /> },
-        { label: "Modo de entrenamiento", note: "Perfil › Preferencias", el: <ModePreferenceScreen /> },
+        { label: "Modo de entrenamiento", note: "Hoja desde el detalle de rutina o Ajustes de entrenamiento", el: React.createElement(window.FFTrainingSettingsScreen, { v: "dRow", sheet: "mode" }) },
       ],
     },
     {
@@ -8827,16 +8894,21 @@ function Catalog() {
       title: "Modo pro",
       cells: (() => {
         const PT = window.FFProTrainer, PL = window.FFWListMode, PM = window.FFWModePreference, PS = window.FFProSummary, demo = window.FFProDemoBlocks();
+        const R = (p) => React.createElement(window.FFProRestScreen, p); const P = (p) => React.createElement(window.FFProSectionScreen, p);
         const T = (p) => React.createElement(PT, p), L = (p) => React.createElement(PL, p), S = (p) => React.createElement(PS, { onHome: noop, onMilestone: noop, ...p });
         return [
-          { label: "Perfil · Modo de entrenamiento", note: "Interruptor «Modo pro» (Avanzado)", el: React.createElement(PM) },
-          { label: "Entrenador · descanso", note: "Serie 1 de 3: reps hechas + peso informativo", el: T({ weight: "rest", blockIdx: 1, restSerie: [1, 3] }) },
-          { label: "Entrenador · descanso", note: "Última serie: + ¿Cómo sentiste tu serie?", el: T({ weight: "rest", blockIdx: 1 }) },
-          { label: "Entrenador · descanso", note: "Editar peso: kg / lb, ±2,5 kg o ±5 lb", el: T({ weight: "rest", blockIdx: 1, restState: "edit" }) },
-          { label: "Entrenador · descanso", note: "Primera vez: peso vacío", el: T({ weight: "rest", blockIdx: 1, restState: "first" }) },
-          { label: "Entrenador · For time", note: "Antes de empezar · pesos", el: T({ blocksOverride: demo, blockIdx: 3, preWeights: true }) },
-          { label: "Entrenador · AMRAP", note: "Antes de empezar · pesos", el: T({ blocksOverride: demo, blockIdx: 4, preWeights: true }) },
-          { label: "Entrenador · EMOM", note: "Explicación + pesos en una hoja", el: T({ blocksOverride: demo, blockIdx: 5, preWeights: true }) },
+          { label: "Modo de entrenamiento", note: "Interruptor «Modo pro» en la hoja de modo", el: React.createElement(window.FFTrainingSettingsScreen, { v: "dRow", sheet: "mode" }) },
+          { label: "Entrenador · descanso · registro", note: "Serie 1 de 3 · reps y peso", el: R({ serie: [1, 3] }) },
+          { label: "Entrenador · descanso · registro", note: "Última serie · + ¿Cómo sentiste tu serie?", el: R({ serie: [3, 3] }) },
+          { label: "Entrenador · descanso · peso manual", note: "Al tocar el peso · teclado", el: R({ serie: [2, 3], keypad: true }) },
+          { label: "Entrenador · descanso · serie guardada", note: "Tras Guardar · Editar reabre la hoja", el: R({ serie: [1, 3], saved: true }) },
+          { label: "Entrenador · For time · antes de empezar", note: "Pesos por ejercicio · se puede omitir", el: P({ blockIdx: 3, stage: "pre" }) },
+          { label: "Entrenador · AMRAP · antes de empezar", note: "Pesos por ejercicio · se puede omitir", el: P({ blockIdx: 4, stage: "pre" }) },
+          { label: "Entrenador · EMOM · antes de empezar", note: "Explicación + pesos en la misma hoja", el: P({ blockIdx: 5, stage: "pre" }) },
+          { label: "Entrenador · For time · al terminar", note: "Solo ¿Cómo sentiste la sección?", el: P({ blockIdx: 3, stage: "end" }) },
+          { label: "Entrenador · AMRAP · al terminar", note: "Solo ¿Cómo sentiste la sección?", el: P({ blockIdx: 4, stage: "end" }) },
+          { label: "Entrenador · EMOM · al terminar", note: "Solo ¿Cómo sentiste la sección?", el: P({ blockIdx: 5, stage: "end" }) },
+          { label: "Entrenador · sección guardada", note: "Tras Guardar · Editar reabre la hoja", el: P({ blockIdx: 3, stage: "saved" }) },
           { label: "Modo lista · ejercicio", note: "Nombre, reps · RIR; info y cambiar discretos", el: L({ tableDemo: "closed" }) },
           { label: "Modo lista · series", note: "Registro de series en la tarjeta", el: L({ tableDemo: "progress" }) },
           { label: "Modo lista · series", note: "Series completas: + sensación de la sección", el: L({ tableDemo: "feel" }) },
@@ -8851,6 +8923,18 @@ function Catalog() {
           { label: "Modo lista · EMOM", note: "Al terminar: minutos + sensación", el: L({ timedDemo: "feelEmom" }) },
           { label: "Resumen · modo pro", note: "«Ver logro desbloqueado» arriba", el: S({}) },
           { label: "Resumen · modo pro", note: "Detalle por sección con pesos y sensación", el: S({ focusDetail: true }) },
+        ];
+      })(),
+    },
+    {
+      title: "Ajustes de entrenamiento",
+      cells: (() => {
+        const A = (p) => React.createElement(window.FFTrainingSettingsScreen, p);
+        return [
+          { label: "Workout · ajustes de entrenamiento", note: "Fila al pie de la tarjeta del plan", el: A({ v: "wB" }) },
+          { label: "Ajustes de entrenamiento", note: "Hoja: días, plan y modo de entrenamiento", el: A({ v: "wB", sheet: "plan" }) },
+          { label: "Detalle de rutina · modo", note: "Línea de modo bajo Iniciar rutina", el: A({ v: "dRow" }) },
+          { label: "Modo de entrenamiento", note: "Hoja desde ajustes o el detalle · Listo guarda", el: A({ v: "dRow", sheet: "mode" }) },
         ];
       })(),
     },
@@ -8872,4 +8956,640 @@ function Catalog() {
   );
 }
 
+// ── Modo pro · descanso con hoja de registro (aprobado 28 oct 2026, draft 2a) ──
+(function () {
+const { Button } = window.FitFightersDesignSystem_4614fc;
+const SHEET = {
+  "--ff-bg": "#0F0F0F", "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222",
+  "--ff-border": "#2A2A2A", "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+const FEELS = ["Ligera", "Moderada", "Muy pesada"];
+const STEP = { kg: 2.5, lb: 5 };
+const fmt = (v) => (v == null ? "—" : String(Math.round(v * 10) / 10));
+const eyebrow = { fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" };
+
+function demoEx() {
+  const b = ((window.FF_DATA || {}).trainerBlocks || [])[0] || {};
+  const list = b.exercises || (b.exercise ? [b.exercise] : []);
+  const ex = list.filter((x) => x.mode !== "time" && x.mode !== "failure").pop() || list[0] || {};
+  return { name: ex.name || "Press de pecho mancuernas en banco inclinado", reps: ex.reps || 10 };
+}
+
+function Pm({ minus, onClick, label }) {
+  return (
+    <button onClick={onClick} aria-label={label} style={{ height: 44, borderRadius: 12, border: "none", background: "var(--ff-surface-2)", color: "var(--ff-text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" />{minus ? null : <line x1="12" y1="5" x2="12" y2="19" />}</svg>
+    </button>
+  );
+}
+function Unit({ unit, setUnit }) {
+  return (
+    <div role="radiogroup" aria-label="Unidad" style={{ display: "flex", height: 24, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid var(--ff-border)" }}>
+      {["kg", "lb"].map((u) => (
+        <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 28, padding: "0 7px", borderRadius: 999, border: "none", cursor: "pointer", background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : "var(--ff-text-3)", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+      ))}
+    </div>
+  );
+}
+function ValueCard({ label, aside, value, suffix, onTap, onMinus, onPlus, minusLabel, plusLabel }) {
+  const num = (
+    <span style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 5 }}>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 30, letterSpacing: "-1px", lineHeight: 1, color: value == null ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", borderBottom: onTap ? "1px dashed #555" : "none", paddingBottom: onTap ? 4 : 0 }}>{fmt(value)}</span>
+      {suffix ? <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text-3)" }}>{suffix}</span> : null}
+    </span>
+  );
+  return (
+    <div style={{ minWidth: 0, background: "var(--ff-bg)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ height: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={eyebrow}>{label}</span>
+        {aside}
+      </div>
+      {onTap ? <button onClick={onTap} aria-label="Escribir peso" style={{ height: 40, background: "transparent", border: "none", padding: 0, cursor: "text", display: "flex", alignItems: "center", justifyContent: "center" }}>{num}</button>
+        : <div style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}>{num}</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 6 }}>
+        <Pm minus onClick={onMinus} label={minusLabel} />
+        <Pm onClick={onPlus} label={plusLabel} />
+      </div>
+    </div>
+  );
+}
+
+// Copia del teclado de peso aprobado (1a) para que el borrador sea autónomo.
+const KL = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
+function KeypadSheet({ ex, serie, kg, last, unit: unit0, onSave, onClose }) {
+  const [val, setVal] = React.useState(kg == null ? "" : fmt(kg));
+  const [unit, setUnit] = React.useState(unit0);
+  const key = (k) => setVal((v) => {
+    if (k === "del") return v.slice(0, -1);
+    if (k === "." && (v.includes(".") || v === "")) return v;
+    if (v.length >= 5) return v;
+    return v === "0" && k !== "." ? k : v + k;
+  });
+  const n = parseFloat(val);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,.5)" }}>
+      <div onClick={onClose} style={{ flex: 1 }} />
+      <div style={{ background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "24px 24px 0 0", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={eyebrow}>Peso · Serie {serie[0]} de {serie[1]}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: "-.3px", color: "var(--ff-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.name}</span>
+          </div>
+          <button onClick={onClose} aria-label="Cancelar" style={{ width: 36, height: 36, margin: "-4px -4px 0 0", borderRadius: 999, border: "none", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <div style={{ height: 76, borderRadius: 14, border: "1px solid var(--ff-green)", background: "var(--ff-bg)", display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 38, letterSpacing: "-1px", lineHeight: 1, color: val ? "var(--ff-text)" : "var(--ff-text-3)", fontVariantNumeric: "tabular-nums" }}>{val || "0"}</span>
+          <span style={{ width: 2, height: 34, background: "var(--ff-green)", borderRadius: 1, margin: "0 6px 0 3px" }} />
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 16, fontWeight: 600, color: "var(--ff-text-2)", marginTop: 8 }}>{unit}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Última vez <span style={{ color: "var(--ff-text-2)", fontWeight: 600 }}>{fmt(last)} {unit0}</span></span>
+          <div role="radiogroup" aria-label="Unidad" style={{ display: "flex", height: 32, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-bg)" }}>
+            {["kg", "lb"].map((u) => (
+              <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 44, padding: "0 12px", borderRadius: 999, border: "none", cursor: "pointer", background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+            ))}
+          </div>
+        </div>
+        <Button disabled={isNaN(n)} onClick={() => onSave(n, unit)}>Guardar</Button>
+      </div>
+      <div style={{ height: 246, boxSizing: "border-box", background: "#2B2B2D", padding: "6px 6px 30px", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoRows: "minmax(0, 1fr)", gap: 6, flexShrink: 0 }}>
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map((d) => {
+          const fn = d === "." || d === "del";
+          return (
+            <button key={d} onClick={() => key(d)} style={{ border: "none", borderRadius: 6, padding: 0, cursor: "pointer", background: fn ? "transparent" : "#5A5A5E", boxShadow: fn ? "none" : "0 1px 0 rgba(0,0,0,.35)", color: "#fff", fontFamily: "-apple-system, system-ui, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 24, lineHeight: 1 }}>{d === "del" ? "⌫" : d}</span>
+              {KL[d] ? <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: ".18em", lineHeight: 1.3 }}>{KL[d]}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Hoja de registro del descanso. Reps obligatorias (precargadas con las del plan), peso
+// informativo (último usado) y, solo en la última serie, la sensación. Sin barra de arrastre:
+// la hoja se cierra al guardar.
+function RestLogSheet({ serie = [1, 3], reps: reps0 = null, kg: kg0 = 22.5, last = 22.5, unit: unit0 = "kg", keypad = false, feel: feel0 = null, onDone }) {
+  const ex = React.useMemo(demoEx, []);
+  const [reps, setReps] = React.useState(reps0 ?? ex.reps);
+  const [kg, setKg] = React.useState(kg0);
+  const [unit, setUnit] = React.useState(unit0);
+  const [feel, setFeel] = React.useState(feel0);
+  const [kp, setKp] = React.useState(keypad);
+  const lastSerie = serie[0] === serie[1];
+  const ready = reps > 0 && (!lastSerie || !!feel);
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", ...SHEET }}>
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,.55) 62%)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "32px 32px 0 0", padding: "20px 16px 28px", display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 -12px 40px rgba(0,0,0,.45)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0 }}>
+          <span style={eyebrow}>Serie {serie[0]} de {serie[1]} terminada</span>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: "-.3px", color: "var(--ff-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.name}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
+          <ValueCard label="Reps hechas" value={reps} minusLabel="Una rep menos" plusLabel="Una rep más"
+            onMinus={() => setReps((r) => Math.max(0, r - 1))} onPlus={() => setReps((r) => r + 1)} />
+          <ValueCard label="Peso" aside={<Unit unit={unit} setUnit={setUnit} />} value={kg} suffix={unit} onTap={() => setKp(true)} minusLabel="Menos peso" plusLabel="Más peso"
+            onMinus={() => setKg((k) => Math.max(0, (k || 0) - STEP[unit]))} onPlus={() => setKg((k) => (k || 0) + STEP[unit])} />
+        </div>
+        {lastSerie ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)" }}>¿Cómo sentiste tu serie?</span>
+            <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+              {FEELS.map((f) => {
+                const on = feel === f;
+                return (
+                  <button key={f} role="radio" aria-checked={on} onClick={() => setFeel(f)} style={{ height: 44, borderRadius: 12, cursor: "pointer", padding: "0 4px", background: on ? "#fff" : "var(--ff-surface-2)", border: "1px solid " + (on ? "#fff" : "var(--ff-border)"), color: on ? "#0B0B0B" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>{f}</button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        <Button disabled={!ready} onClick={() => onDone && onDone({ reps, kg, unit, feel })}>Guardar</Button>
+      </div>
+      {kp ? <KeypadSheet ex={ex} serie={serie} kg={kg} last={last} unit={unit} onClose={() => setKp(false)} onSave={(v, u) => { setKg(v); setUnit(u); setKp(false); }} /> : null}
+    </div>
+  );
+}
+// Tras guardar: confirmación discreta sobre el descanso. El registro se envía al terminar el
+// descanso, así que hasta entonces se puede corregir.
+function SavedChip({ serie = [1, 3], onEdit }) {
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 212, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44, padding: "0 4px 0 12px", borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", pointerEvents: "auto" }}>
+        <span style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(46,207,122,.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2ECF7A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        </span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>Serie {serie[0]} de {serie[1]} guardada</span>
+        <span style={{ width: 1, height: 18, background: "rgba(255,255,255,.18)" }} />
+        <button onClick={onEdit} style={{ height: 36, padding: "0 12px", borderRadius: 999, border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 11.5, letterSpacing: "-.2px", color: "var(--ff-red)" }}>Editar</button>
+      </div>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 11.5, color: "rgba(255,255,255,.62)" }}>Puedes cambiarla hasta que termine el descanso.</span>
+    </div>
+  );
+}
+// Descanso del entrenador con registro: anillo aprobado intacto + hoja / indicador encima.
+function ProRestScreen({ serie = [1, 3], keypad = false, saved = false }) {
+  const [rec, setRec] = React.useState(saved ? { reps: 10, kg: 22.5, unit: "kg", feel: null } : null);
+  const [open, setOpen] = React.useState(!saved);
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      {React.createElement(window.FFProTrainer, { blockIdx: 1 })}
+      {open ? <RestLogSheet serie={serie} keypad={keypad && !rec} reps={rec ? rec.reps : null} kg={rec ? rec.kg : 22.5} unit={rec ? rec.unit : "kg"} feel={rec ? rec.feel : null} onDone={(d) => { setRec(d); setOpen(false); }} />
+        : <SavedChip serie={serie} onEdit={() => setOpen(true)} />}
+    </div>
+  );
+}
+window.FFProRestScreen = ProRestScreen;
+})();
+
+// ── Modo pro · For time, AMRAP y EMOM en el entrenador (aprobado 28 oct 2026, draft 3a) ──
+(function () {
+const { Button, SECTION_TYPES } = window.FitFightersDesignSystem_4614fc;
+const SHEET = {
+  "--ff-bg": "#0F0F0F", "--ff-surface": "#1A1A1A", "--ff-surface-2": "#222222",
+  "--ff-border": "#2A2A2A", "--ff-text": "#F0F0F0", "--ff-text-2": "#B5B5B5", "--ff-text-3": "#888888",
+};
+const FEELS = ["Ligera", "Moderada", "Muy pesada"];
+const STEP = { kg: 2.5, lb: 5 };
+const BODYWEIGHT = ["Flexiones", "Burpees", "Plancha frontal", "Trote continuo", "Sprint en cinta", "Sentadilla con salto", "Mountain climbers", "Jumping jacks", "Fondos en banco"];
+const LAST_KG = { "Thruster con mancuernas": 12.5, "Swing con kettlebell": 16, "Peso muerto con barra": 60, "Sentadilla goblet": 20 };
+const loaded = (x) => !!x && x.mode !== "time" && x.mode !== "failure" && BODYWEIGHT.indexOf(x.name) < 0;
+const fmt = (v) => (v == null ? "—" : String(Math.round(v * 10) / 10));
+const mmss = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+const eyebrow = { fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)" };
+const body = { fontFamily: "var(--font-body)", fontSize: 13, lineHeight: 1.5, color: "var(--ff-text-2)", margin: 0, textWrap: "pretty" };
+
+function Pm({ minus, onClick, label, w }) {
+  return (
+    <button onClick={onClick} aria-label={label} style={{ width: w, height: 44, borderRadius: 12, border: "none", background: "var(--ff-surface-2)", color: "var(--ff-text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" />{minus ? null : <line x1="12" y1="5" x2="12" y2="19" />}</svg>
+    </button>
+  );
+}
+function Unit({ unit, setUnit }) {
+  return (
+    <div role="radiogroup" aria-label="Unidad" style={{ display: "flex", height: 24, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid var(--ff-border)", flexShrink: 0 }}>
+      {["kg", "lb"].map((u) => (
+        <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 28, padding: "0 7px", borderRadius: 999, border: "none", cursor: "pointer", background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : "var(--ff-text-3)", fontFamily: "var(--font-body)", fontSize: 11, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+      ))}
+    </div>
+  );
+}
+function Num({ value, suffix, size = 30, onTap, label }) {
+  const n = (
+    <span style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 5 }}>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: size, letterSpacing: "-1px", lineHeight: 1, color: value == null ? "var(--ff-text-3)" : "var(--ff-text)", fontVariantNumeric: "tabular-nums", borderBottom: onTap ? "1px dashed #555" : "none", paddingBottom: onTap ? 4 : 0 }}>{value == null ? "—" : value}</span>
+      {suffix ? <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-text-3)" }}>{suffix}</span> : null}
+    </span>
+  );
+  return onTap ? <button onClick={onTap} aria-label={label} style={{ height: 44, background: "transparent", border: "none", padding: 0, cursor: "text", display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</button>
+    : <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>{n}</div>;
+}
+function Feel({ value, onChange }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)" }}>¿Cómo sentiste la sección?</span>
+      <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6 }}>
+        {FEELS.map((f) => {
+          const on = value === f;
+          return <button key={f} role="radio" aria-checked={on} onClick={() => onChange(f)} style={{ height: 44, borderRadius: 12, cursor: "pointer", padding: "0 4px", background: on ? "#fff" : "var(--ff-surface-2)", border: "1px solid " + (on ? "#fff" : "var(--ff-border)"), color: on ? "#0B0B0B" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600 }}>{f}</button>;
+        })}
+      </div>
+    </div>
+  );
+}
+function Head({ block, eyebrowTxt, title }) {
+  const sec = SECTION_TYPES[block.type] || {};
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: sec.color, flexShrink: 0 }} />
+        <span style={{ ...eyebrow, color: sec.color }}>{sec.label} · {eyebrowTxt}</span>
+      </div>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: "-.3px", color: "var(--ff-text)", lineHeight: 1.35 }}>{title}</span>
+    </div>
+  );
+}
+function Sheet({ children, zIndex = 1 }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex, display: "flex", flexDirection: "column", justifyContent: "flex-end", ...SHEET }}>
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.2) 0%, rgba(0,0,0,.6) 50%)" }} />
+      <div style={{ position: "relative", maxHeight: "88%", display: "flex", flexDirection: "column", background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "32px 32px 0 0", boxShadow: "0 -12px 40px rgba(0,0,0,.45)" }}>{children}</div>
+    </div>
+  );
+}
+function Caution() {
+  return (
+    <p style={{ display: "flex", gap: 7, alignItems: "flex-start", fontFamily: "var(--font-body)", fontSize: 11.5, lineHeight: 1.45, color: "var(--ff-text-3)", margin: 0, textWrap: "pretty" }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+      <span>Recuerda que cargar más peso no es señal de mejores resultados. Evita lesiones.</span>
+    </p>
+  );
+}
+
+// Teclado aprobado (1a). kind "kg" = peso con kg/lb; kind "time" = mm:ss que se llena desde la derecha.
+const KL = { 2: "ABC", 3: "DEF", 4: "GHI", 5: "JKL", 6: "MNO", 7: "PQRS", 8: "TUV", 9: "WXYZ" };
+function Keypad({ kind = "kg", eyebrowTxt, title, value, last, unit: unit0 = "kg", onSave, onClose }) {
+  const time = kind === "time";
+  const [val, setVal] = React.useState(time ? "" : value == null ? "" : fmt(value));
+  const [unit, setUnit] = React.useState(unit0);
+  const key = (k) => setVal((v) => {
+    if (k === "del") return v.slice(0, -1);
+    if (k === ".") return time || v.includes(".") || v === "" ? v : v + k;
+    if (v.length >= (time ? 4 : 5)) return v;
+    return v === "0" && !time ? k : v + k;
+  });
+  const digits = val.padStart(4, "0");
+  const secs = time ? parseInt(digits.slice(0, 2), 10) * 60 + parseInt(digits.slice(2), 10) : 0;
+  const shown = time ? (val ? digits.slice(0, 2) + ":" + digits.slice(2) : mmss(value || 0)) : val || "0";
+  const n = time ? (val ? secs : NaN) : parseFloat(val);
+  const ok = time ? !isNaN(n) && parseInt(digits.slice(2), 10) < 60 : !isNaN(n);
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,.5)", ...SHEET }}>
+      <div onClick={onClose} style={{ flex: 1 }} />
+      <div style={{ background: "var(--ff-surface)", borderTop: "1px solid var(--ff-border)", borderRadius: "24px 24px 0 0", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={eyebrow}>{eyebrowTxt}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 15, letterSpacing: "-.3px", color: "var(--ff-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+          </div>
+          <button onClick={onClose} aria-label="Cancelar" style={{ width: 36, height: 36, margin: "-4px -4px 0 0", borderRadius: 999, border: "none", background: "var(--ff-surface-2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+        <div style={{ height: 76, borderRadius: 14, border: "1px solid var(--ff-green)", background: "var(--ff-bg)", display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+          <span style={{ fontFamily: "var(--font-display)", fontSize: 38, letterSpacing: "-1px", lineHeight: 1, color: val ? "var(--ff-text)" : "var(--ff-text-3)", fontVariantNumeric: "tabular-nums" }}>{shown}</span>
+          <span style={{ width: 2, height: 34, background: "var(--ff-green)", borderRadius: 1, margin: "0 6px 0 3px" }} />
+          {time ? null : <span style={{ fontFamily: "var(--font-body)", fontSize: 16, fontWeight: 600, color: "var(--ff-text-2)", marginTop: 8 }}>{unit}</span>}
+        </div>
+        {time ? (
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Escribe minutos y segundos: 842 = 08:42</span>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            {last != null ? <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Última vez <span style={{ color: "var(--ff-text-2)", fontWeight: 600 }}>{fmt(last)} {unit0}</span></span> : <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-3)" }}>Primera vez</span>}
+            <div role="radiogroup" aria-label="Unidad" style={{ display: "flex", height: 32, padding: 2, boxSizing: "border-box", borderRadius: 999, border: "1px solid var(--ff-border)", background: "var(--ff-bg)" }}>
+              {["kg", "lb"].map((u) => (
+                <button key={u} role="radio" aria-checked={unit === u} onClick={() => setUnit(u)} style={{ minWidth: 44, padding: "0 12px", borderRadius: 999, border: "none", cursor: "pointer", background: unit === u ? "#fff" : "transparent", color: unit === u ? "#0B0B0B" : "var(--ff-text-2)", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 700, letterSpacing: ".04em" }}>{u}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        <Button disabled={!ok} onClick={() => onSave(n, unit)}>Guardar</Button>
+      </div>
+      <div style={{ height: 246, boxSizing: "border-box", background: "#2B2B2D", padding: "6px 6px 30px", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gridAutoRows: "minmax(0, 1fr)", gap: 6, flexShrink: 0 }}>
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map((d) => {
+          const fn = d === "." || d === "del";
+          const off = d === "." && time;
+          return (
+            <button key={d} onClick={() => key(d)} style={{ border: "none", borderRadius: 6, padding: 0, cursor: off ? "default" : "pointer", background: fn ? "transparent" : "#5A5A5E", boxShadow: fn ? "none" : "0 1px 0 rgba(0,0,0,.35)", color: "#fff", opacity: off ? 0 : 1, fontFamily: "-apple-system, system-ui, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 24, lineHeight: 1 }}>{d === "del" ? "⌫" : d}</span>
+              {KL[d] ? <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: ".18em", lineHeight: 1.3 }}>{KL[d]}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function metaOf(b) {
+  return b.type === "fortime" ? b.rounds + " rondas" : b.type === "emom" ? b.minutesTotal + " min" : mmss(b.totalTimeSeconds || 0);
+}
+function listOf(b) {
+  const l = (b.exercises || (b.exercise ? [b.exercise] : [])).filter(loaded);
+  return l.length ? l : [{ name: "Swing con kettlebell" }];
+}
+
+// Antes de empezar: no hay descansos, así que el peso se anota aquí. Informativo: se puede omitir.
+function PreSheet({ block, onStart, onSkip }) {
+  const list = React.useMemo(() => listOf(block), [block]);
+  const [w, setW] = React.useState(() => Object.fromEntries(list.map((x) => [x.name, { kg: LAST_KG[x.name] ?? null, unit: "kg" }])));
+  const [kp, setKp] = React.useState(null);
+  const upd = (n, k, f) => setW((o) => ({ ...o, [n]: { ...o[n], [k]: typeof f === "function" ? f(o[n][k]) : f } }));
+  const emom = block.type === "emom";
+  return (
+    <>
+      <Sheet>
+        <div style={{ padding: "20px 16px 0", display: "flex", flexDirection: "column", gap: 12, flexShrink: 0 }}>
+          <Head block={block} eyebrowTxt={metaOf(block)} title="Antes de empezar" />
+          {emom ? <p style={body}>Cada minuto en punto haces las repeticiones indicadas; lo que te sobre del minuto es tu descanso.</p> : null}
+          {emom ? (
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "var(--ff-bg)", border: "1px solid var(--ff-border)", borderRadius: 16, padding: 12 }}>
+              <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: "rgba(255,50,0,.18)", border: "1px solid rgba(255,50,0,.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF3200" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              </span>
+              <p style={body}>Cuando ya no completes las reps del minuto, toca este botón: cierras esta sección y pasas a la siguiente.</p>
+            </div>
+          ) : null}
+          <p style={body}>{emom ? "Anota el peso que vas a usar." : "Esta sección corre contra el tiempo y no te vamos a interrumpir. Anota el peso que vas a usar."}</p>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 16px 0" }}>
+          <div style={{ background: "var(--ff-bg)", border: "1px solid var(--ff-border)", borderRadius: 16 }}>
+            {list.map((x, i) => {
+              const e = w[x.name];
+              return (
+                <div key={x.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 12px 12px 14px", borderTop: i ? "1px solid var(--ff-border)" : "none" }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600, color: "var(--ff-text)", lineHeight: 1.3, textWrap: "pretty" }}>{x.name}</span>
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-3)" }}>{LAST_KG[x.name] != null ? "Última vez " + fmt(LAST_KG[x.name]) + " kg" : "Primera vez"}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                      <Pm minus w={44} label="Menos peso" onClick={() => upd(x.name, "kg", (k) => Math.max(0, (k || 0) - STEP[e.unit]))} />
+                      <div style={{ width: 62, display: "flex", justifyContent: "center" }}><Num value={e.kg == null ? null : fmt(e.kg)} size={18} onTap={() => setKp(x.name)} label="Escribir peso" /></div>
+                      <Pm w={44} label="Más peso" onClick={() => upd(x.name, "kg", (k) => (k || 0) + STEP[e.unit])} />
+                    </div>
+                    <Unit unit={e.unit} setUnit={(u) => upd(x.name, "unit", u)} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ padding: "14px 16px 24px", display: "flex", flexDirection: "column", gap: 12, flexShrink: 0 }}>
+          <Caution />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Button onClick={onStart}>Comenzar sección</Button>
+            <Button variant="text" onClick={onSkip}>Omitir</Button>
+          </div>
+        </div>
+      </Sheet>
+      {kp ? <Keypad eyebrowTxt={"Peso · " + (SECTION_TYPES[block.type] || {}).label} title={kp} value={w[kp].kg} last={LAST_KG[kp]} unit={w[kp].unit} onClose={() => setKp(null)} onSave={(v, u) => { setW((o) => ({ ...o, [kp]: { kg: v, unit: u } })); setKp(null); }} /> : null}
+    </>
+  );
+}
+
+// Al terminar: el resultado (tiempo, rondas, minutos) lo calcula el entrenador; solo se pregunta la sensación.
+function EndSheet({ block, rec, onSave }) {
+  const [feel, setFeel] = React.useState(rec ? rec.feel : null);
+  return (
+    <Sheet>
+      <div style={{ padding: "20px 16px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Head block={block} eyebrowTxt="Sección terminada" title={block.name} />
+        <Feel value={feel} onChange={setFeel} />
+        <Button disabled={!feel} onClick={() => onSave({ feel })}>Guardar</Button>
+      </div>
+    </Sheet>
+  );
+}
+
+function SavedChip({ label, onEdit }) {
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 212, zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, height: 44, padding: "0 4px 0 12px", borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", pointerEvents: "auto" }}>
+        <span style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(46,207,122,.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2ECF7A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        </span>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ width: 1, height: 18, background: "rgba(255,255,255,.18)" }} />
+        <button onClick={onEdit} style={{ height: 36, padding: "0 12px", borderRadius: 999, border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-display)", fontSize: 11.5, letterSpacing: "-.2px", color: "var(--ff-red)" }}>Editar</button>
+      </div>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 11.5, color: "rgba(255,255,255,.62)" }}>Puedes cambiarla hasta que termine el descanso.</span>
+    </div>
+  );
+}
+
+// stage: "pre" (antes de empezar) · "end" (al terminar) · "saved" (descanso tras guardar).
+function ProSectionScreen({ blockIdx = 3, stage = "pre" }) {
+  const [ready, setReady] = React.useState(!!(window.FFProTrainer && window.FFProDemoBlocks));
+  React.useEffect(() => {
+    if (ready) return;
+    const t = setInterval(() => { if (window.FFProTrainer && window.FFProDemoBlocks) { setReady(true); clearInterval(t); } }, 150);
+    return () => clearInterval(t);
+  }, [ready]);
+  const demo = React.useMemo(() => (ready ? window.FFProDemoBlocks() : []), [ready]);
+  const [st, setSt] = React.useState(stage);
+  const [rec, setRec] = React.useState(null);
+  if (!ready) return <div style={{ height: "100%", background: "#0B0B0B" }} />;
+  const block = demo[blockIdx] || {};
+  const restIdx = demo.findIndex((b) => b.type === "rest");
+  const behind = st === "saved" ? { blocksOverride: demo, blockIdx: restIdx < 0 ? 1 : restIdx } : { blocksOverride: demo, blockIdx };
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      {React.createElement(window.FFProTrainer, behind)}
+      {st === "pre" ? <PreSheet block={block} onStart={() => setSt("live")} onSkip={() => setSt("live")} /> : null}
+      {st === "end" ? <EndSheet block={block} rec={rec} onSave={(r) => { setRec(r); setSt("saved"); }} /> : null}
+      {st === "saved" ? <SavedChip label="Sección guardada" onEdit={() => setSt("end")} /> : null}
+    </div>
+  );
+}
+window.FFProSectionScreen = ProSectionScreen;
+})();
+
 window.Catalog = Catalog;
+
+// ── Ajustes de entrenamiento · plan y modo fuera del perfil (aprobado 30 oct 2026, draft 4b + 4c) ──
+// Workout: fila «Ajustes de entrenamiento» al pie de la tarjeta del plan → hoja con días, plan y modo.
+// Detalle de rutina: línea de modo bajo «Iniciar rutina» → hoja de modo. Monta las pantallas aprobadas sin tocarlas.
+(function () {
+const { Button, MenuRow } = window.FitFightersDesignSystem_4614fc;
+const LIGHT = {
+  "--ff-bg": "#F7F7F7", "--ff-surface": "#FFFFFF", "--ff-surface-2": "#F1F1F1", "--ff-border": "#E2E2E2",
+  "--ff-text": "#141414", "--ff-text-2": "#5C5C5C", "--ff-text-3": "#8E8E8E", "--ff-red-light": "#CC2800",
+  "--ff-primary-container": "rgba(255,50,0,0.10)",
+};
+const MODES = [
+  { key: "trainer", name: "Entrenador virtual", desc: "Video de cada ejercicio, cronómetros y avance automático." },
+  { key: "list", name: "Lista de ejercicios", desc: "Toda la rutina en una lista. Marcas cada serie a tu ritmo." },
+];
+const modeLabel = (mode, pro) => (MODES.find((m) => m.key === mode) || MODES[0]).name + (pro ? " · Pro" : "");
+const Ico = (d, size = 18) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
+const I_SWAP = <><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>;
+const I_CAL = <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>;
+const I_LIST = <><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>;
+const I_CHEV = <polyline points="9 18 15 12 9 6" />;
+const I_SET = <><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></>;
+const eyebrow = { fontFamily: "var(--font-body)", fontSize: 10, fontWeight: 600, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--ff-text-3)", margin: 0 };
+
+// Crea un nodo dentro de la pantalla aprobada (sin editarla) para montar ahí un portal.
+function useSlot(ref, find, first) {
+  const [node, setNode] = React.useState(null);
+  React.useEffect(() => {
+    let el = null;
+    const t = setInterval(() => {
+      const root = ref.current && ref.current.firstElementChild;
+      const target = root && find(root);
+      if (!target) return;
+      clearInterval(t);
+      el = document.createElement("div");
+      if (first) target.insertBefore(el, target.firstChild); else target.appendChild(el);
+      setNode(el);
+    }, 80);
+    return () => { clearInterval(t); if (el) el.remove(); };
+  }, []);
+  return node;
+}
+const portal = (node, el) => (node ? ReactDOM.createPortal(el, node) : null);
+
+function Sheet({ children, onClose }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column", justifyContent: "flex-end", ...LIGHT }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+      <div style={{ position: "relative", background: "var(--ff-surface)", borderRadius: "32px 32px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "center" }}><span style={{ width: 38, height: 4, borderRadius: 999, background: "var(--ff-border)" }} /></div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PlanSheet({ mode, pro, onMode, onClose }) {
+  const p = window.FF_DATA.program;
+  const icon = (d) => Ico(d);
+  return (
+    <Sheet onClose={onClose}>
+      <div>
+        <p style={{ ...eyebrow, marginBottom: 6 }}>{p.name}</p>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: 0 }}>Ajustes de entrenamiento</p>
+      </div>
+      <div style={{ border: "1px solid var(--ff-border)", borderRadius: 16, overflow: "hidden" }}>
+        <MenuRow icon={icon(I_CAL)} label="Modificar días" sublabel="Elige qué días de la semana entrenas" onClick={onClose} />
+        <MenuRow icon={icon(I_SWAP)} label="Cambiar plan" sublabel="Otro programa o nivel" divider onClick={onClose} />
+        <MenuRow icon={icon(I_LIST)} label="Modo de entrenamiento" sublabel={modeLabel(mode, pro)} divider onClick={onMode} />
+      </div>
+    </Sheet>
+  );
+}
+
+function ModeSheet({ mode, pro, setMode, setPro, onClose }) {
+  const Radio = ({ on }) => <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box", border: on ? "6px solid var(--ff-red)" : "2px solid var(--ff-text-3)", transition: "border .15s ease" }} />;
+  return (
+    <Sheet onClose={onClose}>
+      <div>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 17, color: "var(--ff-text)", letterSpacing: "-.3px", margin: "0 0 6px" }}>Modo de entrenamiento</p>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)", lineHeight: 1.5, margin: 0, textWrap: "pretty" }}>Se guarda para tus próximas rutinas. Tu programa y tu progreso no cambian.</p>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {MODES.map((m) => {
+          const sel = m.key === mode;
+          return (
+            <button key={m.key} onClick={() => setMode(m.key)} role="radio" aria-checked={sel} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 12, border: `1px solid ${sel ? "var(--ff-red)" : "var(--ff-border)"}`, background: sel ? "var(--ff-primary-container)" : "transparent", cursor: "pointer", textAlign: "left" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>{m.name}</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>{m.desc}</p>
+              </div>
+              <Radio on={sel} />
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={() => setPro(!pro)} role="switch" aria-checked={pro} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 12, border: "1px solid var(--ff-border)", background: "transparent", cursor: "pointer", textAlign: "left" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, color: "var(--ff-text)", margin: 0 }}>Modo pro</p>
+          <p style={{ fontFamily: "var(--font-body)", fontSize: 12, color: "var(--ff-text-2)", lineHeight: 1.4, margin: "3px 0 0", textWrap: "pretty" }}>Registra el peso que cargas en cada ejercicio.</p>
+        </div>
+        <span style={{ width: 44, height: 26, borderRadius: 999, flexShrink: 0, position: "relative", background: pro ? "var(--ff-red)" : "var(--ff-border)", transition: "background .15s ease" }}>
+          <span style={{ position: "absolute", top: 3, left: pro ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s ease" }} />
+        </span>
+      </button>
+      <Button onClick={onClose}>Listo</Button>
+    </Sheet>
+  );
+}
+
+// 4b · fila fija al pie de la tarjeta del plan.
+function WorkoutCardRow({ setOpen }) {
+  const ref = React.useRef(null);
+  const slot = useSlot(ref, (root) => root.children[1] && root.children[1].firstElementChild);
+  return (
+    <div ref={ref} style={{ height: "100%" }}>
+      {React.createElement(window.WorkoutListScreen, { onSelectDay: () => {} })}
+      {portal(slot, (
+        <button onClick={setOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, margin: "0 0 -18px", padding: "0 18px", height: 52, border: "none", borderTop: "1px solid var(--ff-border)", background: "transparent", color: "var(--ff-text)", cursor: "pointer", textAlign: "left" }}>
+          <span style={{ color: "var(--ff-text-2)", display: "flex" }}>{Ico(I_SET, 16)}</span>
+          <span style={{ flex: 1, fontFamily: "var(--font-body)", fontSize: 14, fontWeight: 600 }}>Ajustes de entrenamiento</span>
+          <span style={{ color: "var(--ff-text-3)", display: "flex" }}>{Ico(I_CHEV, 16)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// 4c · línea de modo bajo «Iniciar rutina».
+function DetailFooterMode({ mode, pro, openMode }) {
+  const ref = React.useRef(null);
+  const slot = useSlot(ref, (root) => root.children[2]);
+  return (
+    <div ref={ref} style={{ height: "100%" }}>
+      {React.createElement(window.WorkoutDetailScreen, { onBack: () => {}, onStart: () => {} })}
+      {portal(slot, (
+        <button onClick={openMode} style={{ width: "100%", height: 44, marginTop: 6, marginBottom: -10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
+          <span style={{ color: "var(--ff-text-3)", display: "flex" }}>{Ico(I_LIST, 16)}</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, color: "var(--ff-text-2)" }}>{modeLabel(mode, pro)}</span>
+          <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "var(--ff-red-light)" }}>Cambiar</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PlanAccessScreen({ v = "wA", sheet = null }) {
+  const [ready, setReady] = React.useState(!!(window.WorkoutListScreen && window.WorkoutDetailScreen && window.ProfileScreen));
+  React.useEffect(() => {
+    if (ready) return;
+    const t = setInterval(() => { if (window.WorkoutListScreen && window.WorkoutDetailScreen && window.ProfileScreen) { setReady(true); clearInterval(t); } }, 150);
+    return () => clearInterval(t);
+  }, [ready]);
+  const [open, setOpen] = React.useState(sheet);
+  const [mode, setMode] = React.useState("list");
+  const [pro, setPro] = React.useState(true);
+  if (!ready) return null;
+  const openMode = () => setOpen("mode");
+  const shared = { mode, pro, openMode };
+  let screen;
+  if (v === "wB") screen = <WorkoutCardRow setOpen={() => setOpen("plan")} />;
+  else screen = <DetailFooterMode {...shared} />;
+  return (
+    <div style={{ position: "relative", height: "100%" }}>
+      {screen}
+      {open === "plan" ? <PlanSheet mode={mode} pro={pro} onMode={openMode} onClose={() => setOpen(null)} /> : null}
+      {open === "mode" ? <ModeSheet mode={mode} pro={pro} setMode={setMode} setPro={setPro} onClose={() => setOpen(null)} /> : null}
+    </div>
+  );
+}
+window.FFTrainingSettingsScreen = PlanAccessScreen;
+})();
