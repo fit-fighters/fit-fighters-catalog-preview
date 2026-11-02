@@ -6115,13 +6115,11 @@ function ProfileDl() {
         <ProfileSectionLabel>Cuenta</ProfileSectionLabel>
         <Card padding="0">
           <MenuRow icon={ProfileIcon(<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>)} label="Editar perfil" />
-          <MenuRow icon={ProfileIcon(<><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>)} label="Modificar o cambiar plan" divider />
           <MenuRow icon={ProfileIcon(<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>)} label="Cambiar contraseña" sublabel="Solo cuentas con correo" divider />
         </Card>
         <ProfileSectionLabel>Preferencias</ProfileSectionLabel>
         <Card padding="0">
           <MenuRow icon={ProfileIcon(<><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>)} label="Idioma" sublabel="Español" />
-          <MenuRow icon={ProfileIcon(<><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>)} label="Modo de entrenamiento" sublabel="Lista de ejercicios" divider />
         </Card>
       </div>
     </div>
